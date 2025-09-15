@@ -332,7 +332,7 @@ with SinglePageLayout(server) as layout:
                                             click="""$refs.fileInput.$el.querySelector('input[type=file]').click()""", 
                                             small=True,
                                             block=True,
-                                            color="primary",
+                                            color="success",
                                             style="font-size: 11px;",
                                         )
 
@@ -354,6 +354,16 @@ with SinglePageLayout(server) as layout:
                                             "  }"
                                             "}"
                                         ),
+                                    )
+                                with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
+                                    vuetify.VBtn(
+                                        "Reconstruct",
+                                        click="",
+                                        small=True,
+                                        block=True,
+                                        color="primary",
+                                        disabled=("!picked_points || picked_points.length === 0",),
+                                        style="font-size: 11px;",
                                     )
 
         # Upload prompt when no data is loaded
