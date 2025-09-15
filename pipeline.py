@@ -1,7 +1,7 @@
 # Import system libraries
 import os
 from pathlib import Path
-import base64
+
 # Import trame and vtk modules
 from trame.app import get_server
 from vtkmodules.vtkRenderingCore import (
@@ -12,7 +12,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkVolumeProperty,
     vtkColorTransferFunction,
 )
-from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkFloatArray, vtkTextActor3D
+from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand
 from vtkmodules.vtkIOImage import vtkDICOMImageReader
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleImage
 from vtkmodules.vtkInteractionImage import vtkImageViewer2
@@ -21,6 +21,7 @@ from vtkmodules.vtkFiltersSources import vtkSphereSource
 from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
 import vtkmodules.vtkRenderingOpenGL2
 import vtkmodules.vtkInteractionStyle
+
 # Import tools
 from tools.slice import Slice
 from tools.mouse import Mouse
@@ -29,6 +30,7 @@ from tools.file_handler import load_files
 from tools.plane import Plane
 from tools.view import View
 from tools.point_picker import PointPickingTool
+
 #---------------------------------------------------------
 # Define constant
 #---------------------------------------------------------
@@ -75,6 +77,7 @@ state.point_dialog = False
 state.status = ""
 state.picked_points_content = ""  # Content to be saved in the file
 state.file_content = ""  # Content of the uploaded .pp file
+
 #---------------------------------------------------------
 # Rendering setup
 #---------------------------------------------------------
