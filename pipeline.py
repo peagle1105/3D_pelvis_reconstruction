@@ -12,7 +12,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkVolumeProperty,
     vtkColorTransferFunction,
 )
-from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkFloatArray, vtkTextActor
+from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkFloatArray, vtkTextActor3D
 from vtkmodules.vtkIOImage import vtkDICOMImageReader
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleImage
 from vtkmodules.vtkInteractionImage import vtkImageViewer2
@@ -134,15 +134,6 @@ plane_actor.GetProperty().SetOpacity(0.5)
 
 renderer_3d.AddActor(plane_actor)
 
-# ===== Label =====
-label = vtkTextActor()
-label.GetTextProperty().SetFontSize(24)
-label.GetTextProperty().SetColor(1.0, 1.0, 1.0)  # White color
-label.GetTextProperty().BoldOn()
-label.GetTextProperty().SetFontFamilyToArial()
-
-renderer_3d.AddActor(label)
-
 #---------------------------------------------------------
 # Tools initialization
 #---------------------------------------------------------
@@ -187,12 +178,9 @@ point_picker = PointPickingTool(
     state=state,
     renderer_2d=renderer_2d,
     renderer_3d=renderer_3d,
-    label_actor=label,
     sphere_actor=sphere_actor,
     get_dicom_reader_callback=get_dicom_reader
 )
-
-
 
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
@@ -244,7 +232,7 @@ def upload_new_series():
 #---------------------------------------------------------
 # Callback functions
 #---------------------------------------------------------
-# ~~~~~~ Slice change ~~~~~~
+# ===== Slice change ====
 @state.change("slice_index")
 def on_slice_change(slice_index, **kwargs):
     global viewer_2d
@@ -263,7 +251,7 @@ def on_slice_change(slice_index, **kwargs):
     ctrl.view_update_2d()
     ctrl.view_update_3d()
 
-# ~~~~~~ View orientation change ~~~~~~
+# ===== View orientation change =====
 @state.change("current_view")
 def on_view_change(current_view, **kwargs):
     global viewer_2d, dicom_reader
@@ -295,13 +283,13 @@ def on_view_change(current_view, **kwargs):
     else:
         print("❌ dicom_reader is None in on_view_change")
 
-# ~~~~~~ Opacity change ~~~~~~
+# ===== Opacity change =====
 @state.change("opacity")
 def on_opacity_change(opacity, **kwargs):
     if state.data_loaded:
         volume.update_volume_rendering(volume_3d= volume_3d)
 
-# ~~~~~~ Point Picking ~~~~~~
+# ===== Point Picking =====
 @state.change("point_picking_mode")
 def on_point_picking_mode_change(point_picking_mode, **kwargs):
     if point_picking_mode:
@@ -318,7 +306,7 @@ def on_point_picking_mode_change(point_picking_mode, **kwargs):
         ctrl.view_update_3d()
 
 @state.change("picked_points")
-def on_picked_points_change(picked_points, **kwargs):
+def on_picked_points_change(**kwargs):
     if state.point_picking_mode:
         point_picker.recreate_all_points()
         state.picked_points_content = point_picker.save_points()
@@ -350,6 +338,7 @@ def on_file_content_change(file_content, **kwargs):
         point_picker.load_points(file_content)
         # Reset state sau khi xử lý
         state.file_content = None
+
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

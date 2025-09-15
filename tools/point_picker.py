@@ -3,13 +3,12 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 class PointPickingTool:
-    def __init__(self, control, state, renderer_2d, renderer_3d, sphere_actor, label_actor, get_dicom_reader_callback):
+    def __init__(self, control, state, renderer_2d, renderer_3d, sphere_actor, get_dicom_reader_callback):
         self.ctrl = control
         self.state = state
         self.renderer_2d = renderer_2d
         self.renderer_3d = renderer_3d
         self.sphere_actor = sphere_actor
-        self.label_actor = label_actor
         self.get_dicom_reader = get_dicom_reader_callback
         self.next_point_id = 1
         
@@ -217,6 +216,8 @@ class PointPickingTool:
                     "selected": selected,
                     "source": source
                 })
+
+            self.next_point_id = max(self.next_point_id, int(name) + 1) # type: ignore
             return loaded_points
         except Exception as e:
             print(f"Error loading .pp file from content: {e}")
