@@ -3,7 +3,7 @@ from pipeline import get_trame_objects
 server, ctrl, state, render_window_2d, render_window_3d, interactor_2d, interactor_3d = get_trame_objects()
 
 from trame.ui.vuetify import SinglePageLayout
-from trame.widgets import vtk, vuetify, html
+from trame.widgets import vtk, vuetify
 
 state.header = [
     {'text': 'Name', 'value': 'name', 'width': '30%'},
