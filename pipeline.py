@@ -118,7 +118,7 @@ sphere_mapper.SetInputConnection(sphere_source.GetOutputPort())
 
 sphere_actor = vtkActor()
 sphere_actor.SetMapper(sphere_mapper)
-sphere_actor.GetProperty().SetColor(1, 0, 0)  # Red color
+sphere_actor.GetProperty().SetColor(1, 1, 1)  # White color
 sphere_actor.SetVisibility(False)  # Hidden initially
 
 renderer_3d.AddActor(sphere_actor)
@@ -321,18 +321,21 @@ def on_selected_points_change(selected_points, **kwargs):
     selected_names = selected_points if selected_points else []
     updated_points = []
     picked_points = state.picked_points if state.picked_points else []
-    
+    # Cập nhật thuộc tính `selected` trong picked_points
     for point in picked_points:
         point_copy = point.copy()
-        point_copy["selected"] = point["name"] in selected_names  # Sửa dòng này
+        point_copy["selected"] = point["name"] in selected_names
         updated_points.append(point_copy)
     
+    # Gán lại picked_points để kích hoạt reactivity
     state.picked_points = updated_points
     
-    # Update point colors in 3D view
-    if state.point_picking_mode:
-        point_picker.color_change_pick_points()
-        ctrl.view_update_3d()
+    # Update selected spheres
+    point_picker.create_selected_sphere()
+    ctrl.view_update_3d()
+
+    # In số lượng điểm đang được chọn
+    print(len(selected_names))
 
 @state.change("file_content")
 def on_file_content_change(file_content, **kwargs):

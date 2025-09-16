@@ -16,12 +16,13 @@ state.header = [
 #---------------------------------------------------------
 # UI Setup
 #---------------------------------------------------------
-with SinglePageLayout(server) as layout:
+with SinglePageLayout(server, drawer = None) as layout:
     layout.title.set_text("DICOM 3D Viewer")
+    layout.icon.set_text("BME")
     # Main content with custom structure
     with layout.content:
         # Custom toolbar placed right below the title
-        with vuetify.VToolbar(v_if=("data_loaded", True), flat=True, dense=True, style="border-bottom: 1px solid #e0e0e0; margin-bottom: 16px;"):
+        with vuetify.VToolbar(flat=True, dense=True, style="border-bottom: 1px solid #e0e0e0; margin-bottom: 16px;"):
             # File menu
             with vuetify.VMenu(offset_y=True, open_on_hover=True):
                 with vuetify.Template(v_slot_activator="{ on, attrs }"):

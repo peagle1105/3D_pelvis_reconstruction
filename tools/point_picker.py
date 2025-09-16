@@ -17,6 +17,7 @@ class PointPickingTool:
         self.picker_3d = vtkWorldPointPicker()
         self.point_actors = []
         self.label_actors = []
+        self.selected_sphere_actors = []
         self.observer_2d = None
         self.observer_3d = None
     
@@ -53,7 +54,7 @@ class PointPickingTool:
             "x": round(world_point[0], 2),
             "y": round(world_point[1], 2),
             "z": round(world_point[2], 2),
-            "selected": select,
+            "selected": select,  # Đảm bảo thuộc tính selected được thiết lập đúng
             "source": source
         }
 
@@ -83,9 +84,6 @@ class PointPickingTool:
         self.state.flush()  # Force state update after modifying points
 
     def color_change_pick_points(self):
-        # Clear existing points and labels
-        self.hide_pick_points()
-        
         dicom_reader = self.get_dicom_reader()
         if not dicom_reader:
             return
@@ -94,12 +92,8 @@ class PointPickingTool:
         if not img_data:
             return
         
-        # Colors for selected and non-selected points
-        selected_color = (0.878, 0.733, 0.0)  # Gold color for selected points
         normal_color = (1.0, 1.0, 0.0)  # Yellow color for normal points
-
-        # Get selected point names for quick lookup
-        selected_names = self.state.selected_points if self.state.selected_points else []
+        selected_color = (1.0, 0.0, 0.0)  # Red color for selected points
 
         # Add spheres and labels for each picked point
         for point in self.state.picked_points:
@@ -123,10 +117,7 @@ class PointPickingTool:
                 sphere_actor.SetMapper(sphere_mapper)
                 
                 # Set color based on selection status
-                if point["selected"]:
-                    sphere_actor.GetProperty().SetColor(list(selected_color))
-                else:
-                    sphere_actor.GetProperty().SetColor(list(normal_color))
+                sphere_actor.GetProperty().SetColor(list(normal_color))
 
                 sphere_actor.GetProperty().SetOpacity(0.7)
                 
@@ -147,15 +138,19 @@ class PointPickingTool:
             self.renderer_3d.RemoveActor(actor)
         for actor in self.label_actors:
             self.renderer_3d.RemoveActor(actor)
+        for actor in self.selected_sphere_actors:
+            self.renderer_3d.RemoveActor(actor)
             
         self.point_actors.clear()  # Xóa danh sách sphere actors
         self.label_actors.clear()  # Xóa danh sách label actors
+        self.selected_sphere_actors.clear()  # Xóa danh sách selected sphere actors
         self.ctrl.view_update_3d()
 
     def recreate_all_points(self):
         """Recreate all points from the state"""
         self.hide_pick_points()  # Clear existing points
         self.color_change_pick_points()  # Recreate all points
+        self.create_selected_sphere()  # Recreate selected spheres
 
     def pp_file_format(self, point_list):
         """Return points in XML format as string"""
@@ -234,7 +229,7 @@ class PointPickingTool:
         
         # Set label properties (customize as needed)
         text_property = label_actor.GetTextProperty()
-        text_property.SetFontSize(14)
+        text_property.SetFontSize(8)
         text_property.SetColor(1, 1, 1)  # White color
         text_property.SetBackgroundColor(0, 0, 0)  # Black background
         text_property.SetBackgroundOpacity(0.5)
@@ -243,6 +238,44 @@ class PointPickingTool:
         self.label_actors.append(label_actor)
         return label_actor
 
+    def create_selected_sphere(self):
+        """Create or update selected sphere indicators"""
+        # First remove any existing selected spheres
+        for actor in self.selected_sphere_actors:
+            self.renderer_3d.RemoveActor(actor)
+        self.selected_sphere_actors.clear()
+        
+        for point in self.state.selected_points:
+            if point or all(key in point for key in ['x', 'y', 'z']):
+                try:
+                    x, y, z = float(point["x"]), float(point["y"]), float(point["z"])
+                    
+                    # Create a sphere at the point location
+                    sphere_source = vtkSphereSource()
+                    sphere_source.SetRadius(3)  # Larger radius for selected points
+                    sphere_source.SetCenter(x, y, z)
+                    sphere_source.SetPhiResolution(16)
+                    sphere_source.SetThetaResolution(16)
+                    
+                    sphere_mapper = vtkPolyDataMapper()
+                    sphere_mapper.SetInputConnection(sphere_source.GetOutputPort())
+                    
+                    sphere_actor = vtkActor()
+                    sphere_actor.SetMapper(sphere_mapper)
+                    
+                    # Set color for selected points (red)
+                    sphere_actor.GetProperty().SetColor(1.0, 0.0, 0.0)
+                    sphere_actor.GetProperty().SetOpacity(0.7)
+                    
+                    self.renderer_3d.AddActor(sphere_actor)
+                    self.selected_sphere_actors.append(sphere_actor)
+                    
+                except (ValueError, TypeError):
+                    continue
+        
+        self.ctrl.view_update_3d()
+        
+        self.ctrl.view_update_3d()
     # ============ Main functions ============
     def on_click_2d(self, obj, event):
         """Handle click on 2D DICOM view"""
@@ -279,16 +312,15 @@ class PointPickingTool:
 
         # Add point to the list and select it
         point_name = self.add_point(world_point, "DICOM", select=True)
+        
+        # Update selected points and refresh UI
+        # Sửa dòng này: gán trực tiếp danh sách mới thay vì sử dụng append
+        self.update_selected_points()  # Đảm bảo cập nhật thuộc tính selected
         self.color_change_pick_points()
 
         # Update sphere position
         self.sphere_actor.SetPosition(world_point)
         self.sphere_actor.SetVisibility(True)
-        
-        # Update selected points and refresh UI
-        self.state.selected_points = [point_name]
-        self.update_selected_points()
-        self.color_change_pick_points()
         
         # Force state update
         self.state.flush()
@@ -311,16 +343,14 @@ class PointPickingTool:
 
         # Add point to the list and select it
         point_name = self.add_point(world_point, "3D", select=True)
+        
+        # Update selected points and refresh UI
+        self.update_selected_points()  # Đảm bảo cập nhật thuộc tính selected
         self.color_change_pick_points()
 
         # Update sphere position
         self.sphere_actor.SetPosition(world_point)
         self.sphere_actor.SetVisibility(True)
-        
-        # Update selected points and refresh UI
-        self.state.selected_points = [point_name]
-        self.update_selected_points()
-        self.color_change_pick_points()
         
         # Force state update
         self.state.flush()
