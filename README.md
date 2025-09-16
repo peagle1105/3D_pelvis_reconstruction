@@ -31,7 +31,7 @@ python ui.py
 
 ## 📖 Usage Guide
 
-Once the web interface is running:
+**Once the web interface is running:**
 
 - Upload Data
 
