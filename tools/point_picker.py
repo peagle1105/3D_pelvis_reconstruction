@@ -25,11 +25,11 @@ class PointPickingTool:
     def enable_picking(self):
         """Enable point picking by adding event observers"""
         interactor_2d = self.renderer_2d.GetRenderWindow().GetInteractor()
-        interactor_3d = self.renderer_3d.GetRenderWindow().GetInteractor()
+        #interactor_3d = self.renderer_3d.GetRenderWindow().GetInteractor()
         
         # Add observers for right-click events
         self.observer_2d = interactor_2d.AddObserver(vtkCommand.RightButtonPressEvent, self.on_click_2d)
-        self.observer_3d = interactor_3d.AddObserver(vtkCommand.RightButtonPressEvent, self.on_click_3d)
+        #self.observer_3d = interactor_3d.AddObserver(vtkCommand.RightButtonPressEvent, self.on_click_3d)
         
     def disable_picking(self):
         """Disable point picking by removing event observers"""
@@ -327,34 +327,34 @@ class PointPickingTool:
         self.ctrl.view_update_3d()
         self.ctrl.view_update_2d()  # Add this to update 2D view as well
 
-    def on_click_3d(self, obj, event):
-        """Handle click on 3D view"""
-        if not self.state.point_picking_enabled:
-            return
+    # def on_click_3d(self, obj, event):
+    #     """Handle click on 3D view"""
+    #     if not self.state.point_picking_enabled:
+    #         return
 
-        iren = obj
-        mouse_pos = iren.GetEventPosition()
+    #     iren = obj
+    #     mouse_pos = iren.GetEventPosition()
 
-        # Use picker to get world coordinates
-        self.picker_3d.Pick(mouse_pos[0], mouse_pos[1], 0, self.renderer_3d)
-        world_point = self.picker_3d.GetPickPosition()
+    #     # Use picker to get world coordinates
+    #     self.picker_3d.Pick(mouse_pos[0], mouse_pos[1], 0, self.renderer_3d)
+    #     world_point = self.picker_3d.GetPickPosition()
 
-        print(f"Picked point at {world_point} in 3D view")
+    #     print(f"Picked point at {world_point} in 3D view")
 
-        # Add point to the list and select it
-        point_name = self.add_point(world_point, "3D", select=True)
+    #     # Add point to the list and select it
+    #     point_name = self.add_point(world_point, "3D", select=True)
         
-        # Update selected points and refresh UI
-        self.update_selected_points()  # Đảm bảo cập nhật thuộc tính selected
-        self.color_change_pick_points()
+    #     # Update selected points and refresh UI
+    #     self.update_selected_points()  # Đảm bảo cập nhật thuộc tính selected
+    #     self.color_change_pick_points()
 
-        # Update sphere position
-        self.sphere_actor.SetPosition(world_point)
-        self.sphere_actor.SetVisibility(True)
+    #     # Update sphere position
+    #     self.sphere_actor.SetPosition(world_point)
+    #     self.sphere_actor.SetVisibility(True)
         
-        # Force state update
-        self.state.flush()
-        self.ctrl.view_update_3d()
+    #     # Force state update
+    #     self.state.flush()
+    #     self.ctrl.view_update_3d()
 
     def delete_point(self, point_name):
         """Delete a point by name"""
