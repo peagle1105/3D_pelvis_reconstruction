@@ -35,17 +35,42 @@ pip install -r requirements.txt
 
 # 4. Launch the web interface
 python ui.py
-
-
-_How to use_
-
-- Run the project
-- Upload DiCOM files or a zip file contain DICOM files
-- There are some simple functions:
-  \*Pick feature points:
-  Edit > pick points > Left click to check the position > Right click to pick
-  *Choose the orientation of DICOM files
-  View > Axial/Sagittal/Coronal
-  *Upload another set of DICOM files
-  File > new series
 ```
+
+## 📖 Usage Guide
+
+Once the web interface is running:
+
+- Upload Data
+
+- Click the Upload button upload either:
+
+  All of .dcm files
+
+  A .zip archive containing DICOM data
+
+- Add Landmark Points:
+
+  Manually select key anatomical points using the Edit > pick point
+
+  Or upload a .pp file containing pre-defined points by clicking "Load" at pick point windows
+
+- Reconstruct Mesh
+
+  Click the Reconstruct button
+
+==> The system will generate and display a 3D mesh of the pelvis
+
+- Interact with the Mesh:
+
+  Rotate, zoom, and pan the 3D model using mouse controls
+
+- Export mesh: file > export
+
+## 🛠 System Requirements
+
+- Python 3.8 or higher
+
+- Modern web browser (Chrome, Firefox, Edge)
+
+- Minimum 8GB RAM recommended for large DICOM datasets
