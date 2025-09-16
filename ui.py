@@ -1,3 +1,5 @@
+import os
+import base64
 from pipeline import get_trame_objects
 
 server, ctrl, state, render_window_2d, render_window_3d, interactor_2d, interactor_3d = get_trame_objects()
@@ -12,13 +14,21 @@ state.header = [
     {'text': 'Z', 'value': 'z', 'width': '15%'},
     {'text': 'Source', 'value': 'source', 'width': '25%'}
 ]
-
+logo_path = "./static/logo.png"
+with open(logo_path, "rb") as f:
+    img_data = f.read()
+img_base64 = base64.b64encode(img_data).decode('utf-8')
 #---------------------------------------------------------
 # UI Setup
 #---------------------------------------------------------
 with SinglePageLayout(server, drawer = None) as layout:
     layout.title.set_text("DICOM 3D Viewer")
-    layout.icon.set_text("BME")
+    with layout.icon:
+        from trame.widgets import html
+        html.Img(
+            src=f"data:image/png;base64,{img_base64}",
+            style="height: 50px !important; width: auto !important; margin-left: 10px !important;"
+        )
     # Main content with custom structure
     with layout.content:
         # Custom toolbar placed right below the title
@@ -372,24 +382,35 @@ with SinglePageLayout(server, drawer = None) as layout:
             v_if=("!data_loaded", True),
             fluid=True,
             classes="d-flex flex-column align-center justify-center fill-height",
-            style="margin-top: -64px;",
+            style="margin-top: -50px;",
         ):
             vuetify.VIcon("mdi-folder-upload", classes="mb-4", style="font-size: 64px; color: #999;")
             vuetify.VCardTitle("Upload DICOM Series")
-            vuetify.VCardSubtitle("Drag and drop or click to upload a full DICOM series for 3D reconstruction")
-            
-            with vuetify.VFileInput(
-                label="Select DICOM Files",
-                multiple=True,
+            vuetify.VCardSubtitle("Click to upload a full DICOM series for 3D reconstruction")
+
+            # Ẩn VFileInput nhưng vẫn giữ chức năng
+            vuetify.VFileInput(
                 v_model=("uploaded_files", None),
+                multiple=True,
                 hide_input=True,
-                style="max-width: 400px;",
                 accept=".dcm, .dicom, application/dicom, image/*",
+                style="display: none",
+                id = "hidden_file_input"
+            )
+
+            # Button thay thế - có icon và đẹp
+            with vuetify.VBtn(
+                color="primary",
+                elevation=2,
+                large=True,
+                click="document.getElementById('hidden_file_input').click()",  # Khi click → trigger click vào VFileInput
+                classes="mb-4",
             ):
-                pass
-            
+                vuetify.VIcon("mdi-upload", left=True)
+                html.Span("Upload DICOM Files")
+
             vuetify.VDivider(classes="my-4")
-            
+
             vuetify.VChip(
                 "Tip: Use a full series (e.g., CT slices) for best results",
                 color="blue-grey",

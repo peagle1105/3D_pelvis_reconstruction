@@ -26,7 +26,7 @@ import vtkmodules.vtkInteractionStyle
 from tools.slice import Slice
 from tools.mouse import Mouse
 from tools.voxel import Volume
-from tools.file_handler import load_files
+from tools.file_handler import load_files, load_zip_file
 from tools.plane import Plane
 from tools.view import View
 from tools.point_picker import PointPickingTool
@@ -378,7 +378,17 @@ def on_file_upload(uploaded_files, **kwargs):
         return
 
     # Save new files
-    load_files(temp_path= path, file_list= uploaded_files)
+    if len(uploaded_files) > 1:
+        load_files(temp_path= path, file_list= uploaded_files)
+    else:
+        first_file = uploaded_files[0]
+        if first_file["name"].lower().endswith(".zip"):
+            success = load_zip_file(temp_path, first_file)
+            if success:
+                print("✅ Đã giải nén và lưu file DICOM")
+                # Bây giờ bạn có thể quét thư mục temp_path để load DICOM series
+            else:
+                print("❌ Giải nén thất bại")
 
     # Clear previous objects
     if volume_3d:
