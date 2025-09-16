@@ -174,7 +174,7 @@ class PointPickingTool:
                     "name": point["name"],
                     "y": str(point["y"]),
                     "z": str(point["z"]),
-                    "activate": "1" if point["selected"] else "0",
+                    "activate": "1",
                     "x": str(point["x"]),
                 }).tail = "\n"
             # Chuyển cây XML thành chuỗi (không có khai báo XML)
