@@ -77,7 +77,9 @@ state.point_dialog = False
 state.status = ""
 state.picked_points_content = ""  # Content to be saved in the file
 state.file_content = ""  # Content of the uploaded .pp file
-
+state.file_mesh_name = ""
+state.file_mesh_extend = "PLY"
+state.export_dialog = False
 #---------------------------------------------------------
 # Rendering setup
 #---------------------------------------------------------
@@ -133,7 +135,7 @@ plane_actor = vtkActor()
 plane_actor.SetMapper(plane_mapper)
 plane_actor.GetProperty().SetCoatColor(0.765, 0.949, 0.741)
 plane_actor.GetProperty().SetLineWidth(2)
-plane_actor.GetProperty().SetOpacity(0.5)
+plane_actor.GetProperty().SetOpacity(1)
 
 renderer_3d.AddActor(plane_actor)
 
@@ -194,6 +196,9 @@ ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
+@ctrl.add("export_mesh")
+def export_mesh():
+    print("Export mesh")
 @ctrl.add("upload_new_series")
 def upload_new_series():
     """Xóa toàn bộ file trong temp_folder và reset state"""
@@ -273,16 +278,19 @@ def on_view_change(current_view, **kwargs):
             max_slice = dims[1] - 1
 
         state.slice_max = max_slice
-        state.slice_index = max_slice
+        state.slice_index = 0
         if current_view == "axial":
             viewer_2d.SetSliceOrientationToXY()
         elif current_view == "sagittal":
             viewer_2d.SetSliceOrientationToYZ()
         else:
             viewer_2d.SetSliceOrientationToXZ()
+
         plane.update_plane_size()
         plane.update_plane_position()
+        viewer_2d.SetSlice(state.slice_index)
         ctrl.view_update_2d()
+        ctrl.view_update_3d()
     else:
         print("❌ dicom_reader is None in on_view_change")
 
@@ -345,6 +353,13 @@ def on_file_content_change(file_content, **kwargs):
         # Reset state sau khi xử lý
         state.file_content = None
 
+# ===== Export mesh =====
+@state.change("export_dialog")
+def on_dialog_change(export_dialog, **kwargs):
+    if export_dialog:
+        print("Dialog opened")
+    else:
+        print("Dialog closed")
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

@@ -276,6 +276,7 @@ class PointPickingTool:
         self.ctrl.view_update_3d()
         
         self.ctrl.view_update_3d()
+    
     # ============ Main functions ============
     def on_click_2d(self, obj, event):
         """Handle click on 2D DICOM view"""
@@ -314,8 +315,7 @@ class PointPickingTool:
         point_name = self.add_point(world_point, "DICOM", select=True)
         
         # Update selected points and refresh UI
-        # Sửa dòng này: gán trực tiếp danh sách mới thay vì sử dụng append
-        self.update_selected_points()  # Đảm bảo cập nhật thuộc tính selected
+        self.update_selected_points()
         self.color_change_pick_points()
 
         # Update sphere position

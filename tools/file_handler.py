@@ -2,6 +2,9 @@ import base64
 from pathlib import Path, PurePath
 import zipfile
 from io import BytesIO
+import vtk
+import os
+import tempfile
 
 temp_path = "./temp_folder/"
 
@@ -119,3 +122,68 @@ def load_zip_file(temp_path, zip_file):
     except Exception as e:
         print(f"❌ Lỗi khi giải nén: {e}")
         return False
+
+def export_mesh(ctrl, mesh, file_name, extend):
+    """
+    Export mesh and trigger browser download — NO physical file saved.
+    
+    Parameters:
+    - mesh: vtk.vtkPolyData
+    - file_name: str, base name (without extension), e.g., "my_mesh"
+    - extend: str, one of "PLY", "OBJ", "STL"
+    """
+    if not hasattr(mesh, "GetNumberOfPoints"):
+        raise TypeError("Input mesh must be a vtkPolyData object.")
+
+    # Tạo đường dẫn tạm (chỉ để VTK ghi vào — sẽ đọc lại và xóa ngay)
+    suffix = f".{extend.lower()}"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        # Chọn writer theo định dạng
+        match extend.upper():
+            case "PLY":
+                writer = vtk.vtkPLYWriter()
+                writer.SetFileName(tmp_path)
+                writer.SetInputData(mesh)
+                writer.SetFileTypeToBinary()  # hoặc SetFileTypeToASCII()
+                mime_type = "application/octet-stream"
+
+            case "OBJ":
+                writer = vtk.vtkOBJWriter()
+                writer.SetFileName(tmp_path)
+                writer.SetInputData(mesh)
+                # OBJ không hỗ trợ binary trong VTK → luôn là ASCII
+                mime_type = "text/plain"
+
+            case "STL":
+                writer = vtk.vtkSTLWriter()
+                writer.SetFileName(tmp_path)
+                writer.SetInputData(mesh)
+                writer.SetFileTypeToBinary()
+                mime_type = "application/octet-stream"
+
+            case _:
+                raise ValueError(f"Unsupported format: {extend}. Use 'PLY', 'OBJ', or 'STL'.")
+
+        # Ghi file tạm
+        writer.Write()
+
+        # Đọc nội dung file
+        with open(tmp_path, "rb") as f:
+            content = f.read()
+
+        # Trigger download trong Trame
+        full_file_name = f"{file_name}{suffix}"
+        ctrl.download(content, full_file_name, mime_type)
+        print(f"✅ Download triggered: {full_file_name}")
+
+    except Exception as e:
+        print(f"❌ Export failed: {e}")
+        raise e
+
+    finally:
+        # Dọn file tạm
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)

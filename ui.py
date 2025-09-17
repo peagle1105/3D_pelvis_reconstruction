@@ -51,7 +51,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VListItem(
                         "export mesh",
-                        click="export_mesh()",
+                        click="export_dialog = true",
                     )
             
             # View menu
@@ -87,7 +87,34 @@ with SinglePageLayout(server, drawer = None) as layout:
                         "pick point",
                         click="point_picking_mode = true; point_picking_enabled = true",
                     )
+        
+        # Dialog for export mesh
+        with vuetify.VDialog(v_model=("export_dialog", False), width="500"):
+            with vuetify.VCard():
+                with vuetify.VCardTitle("Export Mesh", classes="text-h5 grey lighten-2"):
+                    vuetify.VSpacer()
 
+                with vuetify.VCardText():
+                    vuetify.VTextField(
+                        label="File name",
+                        v_model=("file_mesh_name",),
+                        hide_details=True,
+                        dense=True,
+                    )
+                    vuetify.VSelect(
+                        label="File format",
+                        v_model=("file_mesh_extend",),
+                        items=("['PLY', 'OBJ', 'STL']",),
+                        hide_details=True,
+                        dense=True,
+                        classes="mt-4"
+                    )
+
+                with vuetify.VCardActions():
+                    vuetify.VSpacer()
+                    vuetify.VBtn("Cancel", click="export_dialog = false")
+                    vuetify.VBtn("Save", click="export_dialog = false; saveFile()")
+        
         # Content area with DICOM viewer
         with vuetify.VContainer(
             v_if=("data_loaded", False),
@@ -139,13 +166,13 @@ with SinglePageLayout(server, drawer = None) as layout:
                             
                             with vuetify.VCol(cols=2):
                                 vuetify.VTextField(
-                                    v_model_number=("slice_index",),
-                                    type="number",
+                                    value=("`${slice_index}/${slice_max}`",),
                                     outlined=True,
                                     dense=True,
                                     hide_details=True,
+                                    readonly = True,
                                     disabled=("!data_loaded",),
-                                    style="max-width: 80px;",
+                                    style="max-width: 90px;",
                                     classes="ml-2",
                                 )
                         

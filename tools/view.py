@@ -16,35 +16,33 @@ class View:
 
         if viewer_2d is None or dicom_reader is None:
             return
-        else:        
-            # Update slice range
-            output = dicom_reader.GetOutput()
-            dims = output.GetDimensions()
-            
-            max_slice = 0
-            if self.state.current_view == "axial":
-                max_slice = dims[2] - 1
-            elif self.state.current_view == "sagittal":
-                max_slice = dims[0] - 1
-            elif self.state.current_view == "coronal":
-                max_slice = dims[1] - 1
-
-            self.state.slice_max = max_slice
-            
-            # Reset slice index to middle of new range
-            new_slice_index = max_slice
-            self.state.slice_index = new_slice_index
-            # Set orientation
-            if self.state.current_view == "axial":
-                viewer_2d.SetSliceOrientationToXY()
-            elif self.state.current_view == "sagittal":
-                viewer_2d.SetSliceOrientationToYZ()
-            else:
-                viewer_2d.SetSliceOrientationToXZ()
-            
-            # Update plane position and size
-            self.plane.update_plane_position()
-            self.plane.update_plane_size()
+        
+        # Update slice range
+        output = dicom_reader.GetOutput()
+        dims = output.GetDimensions()
+        
+        max_slice = 0
+        if self.state.current_view == "axial":
+            max_slice = dims[2] - 1
+            viewer_2d.SetSliceOrientationToXY()
+        elif self.state.current_view == "sagittal":
+            max_slice = dims[0] - 1
+            viewer_2d.SetSliceOrientationToYZ()
+        elif self.state.current_view == "coronal":
+            max_slice = dims[1] - 1
+            viewer_2d.SetSliceOrientationToXZ()
+        
+        self.state.slice_max = max_slice
+        
+        # Reset slice index to 0 when changing view
+        self.state.slice_index = 0
+        
+        # Set the slice to 0 for the new orientation
+        viewer_2d.SetSlice(self.state.slice_index)
+        
+        # Update plane position and size
+        self.plane.update_plane_position()
+        self.plane.update_plane_size()
 
         # Reset camera and render
         self.renderer_2d.ResetCamera()
