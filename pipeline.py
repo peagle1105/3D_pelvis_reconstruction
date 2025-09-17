@@ -196,9 +196,6 @@ ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
-@ctrl.add("export_mesh")
-def export_mesh():
-    print("Export mesh")
 @ctrl.add("upload_new_series")
 def upload_new_series():
     """Xóa toàn bộ file trong temp_folder và reset state"""
