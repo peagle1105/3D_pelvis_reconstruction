@@ -89,31 +89,59 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
         
         # Dialog for export mesh
-        with vuetify.VDialog(v_model=("export_dialog", False), width="500"):
+        with vuetify.VDialog(v_model=("export_dialog", False), width="500", persistent=True):
             with vuetify.VCard():
-                with vuetify.VCardTitle("Export Mesh", classes="text-h5 grey lighten-2"):
+                with vuetify.VCardTitle(
+                    "Export Mesh", 
+                    classes="text-h5 grey lighten-2 d-flex justify-space-between align-center",
+                    style="padding: 16px;"
+                ):
+                    vuetify.VIcon("mdi-download", color="primary", style="font-size: 24px;")
                     vuetify.VSpacer()
+                    vuetify.VIcon(
+                        "mdi-close", 
+                        click="export_dialog = false",
+                        style="cursor: pointer;"
+                    )
 
-                with vuetify.VCardText():
+                with vuetify.VCardText(classes="pa-4"):
                     vuetify.VTextField(
                         label="File name",
                         v_model=("file_mesh_name",),
                         hide_details=True,
+                        outlined=True,
                         dense=True,
+                        placeholder="Enter file name",
+                        prepend_icon="mdi-file-outline",
+                        classes="mb-4"
                     )
                     vuetify.VSelect(
                         label="File format",
                         v_model=("file_mesh_extend",),
                         items=("['PLY', 'OBJ', 'STL']",),
                         hide_details=True,
+                        outlined=True,
                         dense=True,
-                        classes="mt-4"
+                        prepend_icon="mdi-format-list-bulleted-type",
+                        classes="mb-2"
                     )
 
-                with vuetify.VCardActions():
-                    vuetify.VSpacer()
-                    vuetify.VBtn("Cancel", click="export_dialog = false")
-                    vuetify.VBtn("Save", click="export_dialog = false; saveFile()")
+                vuetify.VDivider()
+                
+                with vuetify.VCardActions(classes="pa-4 d-flex justify-end"):
+                    vuetify.VBtn(
+                        "Cancel", 
+                        click="export_dialog = false",
+                        color="grey",
+                        text=True,
+                        classes="mr-2",
+                    )
+                    vuetify.VBtn(
+                        "Save", 
+                        click="export_dialog = false; saveFile()",
+                        color="primary",
+                        depressed=True
+                    )
         
         # Content area with DICOM viewer
         with vuetify.VContainer(
