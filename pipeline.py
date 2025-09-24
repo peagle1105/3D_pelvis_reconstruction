@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import random
+import base64
 
 # Import trame and vtk modules
 from trame.app import get_server
@@ -27,7 +28,7 @@ import vtkmodules.vtkInteractionStyle
 from tools.slice import Slice
 from tools.mouse import Mouse
 from tools.voxel import Volume
-from tools.file_handler import load_files, load_zip_file
+from tools.file_handler import load_files, load_zip_file, export_mesh
 from tools.plane import Plane
 from tools.view import View
 from tools.point_picker import PointPickingTool
@@ -60,11 +61,6 @@ from config.config import (
 server = get_server(client_type="vue2")
 ctrl = server.controller # type: ignore
 state = server.state # type: ignore
-
-# Controller functions for increment/decrement
-slice = Slice(ctrl, state)
-ctrl.add("increment_slice")(slice.increment_slice)
-ctrl.add("decrement_slice")(slice.decrement_slice)
 
 # Add shared state variables
 state.uploaded_files = None
@@ -176,6 +172,9 @@ mesh_renderer.ResetCamera()
 def get_dicom_reader():
     return dicom_reader
 
+# ===== Slice =====
+slice = Slice(ctrl, state)
+
 # ===== Mouse ======
 mouse = Mouse(
     control=ctrl, 
@@ -220,12 +219,29 @@ point_picker = PointPickingTool(
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
 
-# Add controller functions for point picking
+# Add controller functions
+## slice
+ctrl.add("increment_slice")(slice.increment_slice)
+ctrl.add("decrement_slice")(slice.decrement_slice)
+## point picking
 ctrl.add("toggle_point_picking")(lambda: setattr(state, "point_picking_enabled", not state.point_picking_enabled))
 ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
+## export mesh
+@ctrl.add("save_file")
+def save_file(**kwargs):
+    export_mesh(
+        ctrl= ctrl,
+        mesh = mesh_source.GetOutput(),
+        file_name= state.file_mesh_name,
+        extend= state.file_mesh_extend,
+    )
+    state.export_dialog = False
+## create model
+
+## upload new series
 @ctrl.add("upload_new_series")
 def upload_new_series():
     """Xóa toàn bộ file trong temp_folder và reset state"""
@@ -380,14 +396,19 @@ def on_file_content_change(file_content, **kwargs):
         # Reset state sau khi xử lý
         state.file_content = None
 
-# ===== Export mesh =====
-@state.change("export_dialog")
-def on_dialog_change(export_dialog, **kwargs):
-    if export_dialog:
-        print("Dialog opened")
-    else:
-        print("Dialog closed")
+# # ===== Export mesh =====
+# @state.change("export_dialog")
+# def on_dialog_change(export_dialog, **kwargs):
+#     if export_dialog:
+#         print()
+#     else:
+#         print("Dialog closed")
 
+@state.change("file_mesh_name")
+def on_name_change(file_mesh_name, **kwargs):
+    print("Name changed to:", repr(file_mesh_name))
+
+# ===== Create model =====
 @state.change("create_model_mode")
 def on_create_model_mode(create_model_mode, **kwargs):
     if create_model_mode:

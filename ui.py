@@ -115,7 +115,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                 with vuetify.VCardText(classes="pa-4"):
                     vuetify.VTextField(
                         label="File name",
-                        v_model=("file_mesh_name",),
+                        v_model=("file_mesh_name",""),
                         hide_details=True,
                         outlined=True,
                         dense=True,
@@ -125,7 +125,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VSelect(
                         label="File format",
-                        v_model=("file_mesh_extend",),
+                        v_model=("file_mesh_extend","PLY"),
                         items=("['PLY', 'OBJ', 'STL']",),
                         hide_details=True,
                         outlined=True,
@@ -146,7 +146,8 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VBtn(
                         "Save", 
-                        click="export_dialog = false; saveFile()",
+                        click= ctrl.save_file(),
+                        disabled=(" file_mesh_name == '' ",),
                         color="primary",
                         depressed=True
                     )

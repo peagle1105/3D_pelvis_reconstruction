@@ -167,23 +167,6 @@ def export_mesh(ctrl, mesh, file_name, extend):
             case _:
                 raise ValueError(f"Unsupported format: {extend}. Use 'PLY', 'OBJ', or 'STL'.")
 
-        # Ghi file tạm
-        writer.Write()
-
-        # Đọc nội dung file
-        with open(tmp_path, "rb") as f:
-            content = f.read()
-
-        # Trigger download trong Trame
-        full_file_name = f"{file_name}{suffix}"
-        ctrl.download(content, full_file_name, mime_type)
-        print(f"✅ Download triggered: {full_file_name}")
-
     except Exception as e:
         print(f"❌ Export failed: {e}")
         raise e
-
-    finally:
-        # Dọn file tạm
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
