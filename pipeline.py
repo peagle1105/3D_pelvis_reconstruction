@@ -1,6 +1,7 @@
 # Import system libraries
 import os
 from pathlib import Path
+import random
 
 # Import trame and vtk modules
 from trame.app import get_server
@@ -12,7 +13,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkVolumeProperty,
     vtkColorTransferFunction,
 )
-from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand
+from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkPLYReader
 from vtkmodules.vtkIOImage import vtkDICOMImageReader
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleImage
 from vtkmodules.vtkInteractionImage import vtkImageViewer2
@@ -35,16 +36,23 @@ from tools.point_picker import PointPickingTool
 # Define constant
 #---------------------------------------------------------
 temp_path = "./temp_folder/"
+train_path = "./train_data/PersonalizedPelvisStructures/"
+
+file_list = os.listdir(train_path)
+file_list = [f for f in file_list if os.path.isfile(os.path.join(train_path, f)) and f.endswith("ply")]
+
+file_sample_mesh = random.choice(file_list)
+
 path = Path(temp_path)
 os.makedirs(path, exist_ok=True)
 
 # Global VTK objects
 from config.config import (
     viewer_2d,
+    volume_3d,
+    dicom_reader,
+    renderer_2d,
 )
-volume_3d = None
-dicom_reader = None
-renderer_2d = None
 
 #---------------------------------------------------------
 # Create server
@@ -69,17 +77,23 @@ state.opacity = 0.5  # Volume rendering opacity
 state.z_height = 0.0
 state.x_height = 0.0  # Add x position for sagittal view
 state.y_height = 0.0  # Add y position for coronal view
+
+state.point_picking_mode = False  # Track if we are in point picking mode
 state.point_picking_enabled = False  # Track if point picking is enabled
 state.picked_points = []  # Store picked points
 state.selected_points = []  # Store selected points for operations
-state.point_picking_mode = False  # Track if we are in point picking mode
-state.point_dialog = False
-state.status = ""
+state.status = "" #Saving status in the picking point windows
 state.picked_points_content = ""  # Content to be saved in the file
+
+state.export_dialog = False
 state.file_content = ""  # Content of the uploaded .pp file
 state.file_mesh_name = ""
 state.file_mesh_extend = "PLY"
-state.export_dialog = False
+
+state.create_model_mode = False
+state.picked_vertices = []
+state.selected_vertices = []
+
 #---------------------------------------------------------
 # Rendering setup
 #---------------------------------------------------------
@@ -139,6 +153,22 @@ plane_actor.GetProperty().SetOpacity(1)
 
 renderer_3d.AddActor(plane_actor)
 
+# ===== Mesh =====
+mesh_source = vtkPLYReader()
+mesh_source.SetFileName(f"{train_path}/{file_sample_mesh}")  # Thay bằng đường dẫn file của bạn
+mesh_source.Update()
+
+# Mapper và Actor
+mesh_mapper = vtkPolyDataMapper()
+mesh_mapper.SetInputConnection(mesh_source .GetOutputPort())
+
+mesh_actor = vtkActor()
+mesh_actor.SetMapper(mesh_mapper)
+
+# Renderer
+mesh_renderer = vtkRenderer()
+mesh_renderer.AddActor(mesh_actor)
+mesh_renderer.ResetCamera()
 #---------------------------------------------------------
 # Tools initialization
 #---------------------------------------------------------
@@ -357,6 +387,27 @@ def on_dialog_change(export_dialog, **kwargs):
         print("Dialog opened")
     else:
         print("Dialog closed")
+
+@state.change("create_model_mode")
+def on_create_model_mode(create_model_mode, **kwargs):
+    if create_model_mode:
+        # Hiển thị mesh và các thuộc tính điểm
+        mesh_actor.SetVisibility(True)
+        render_window_3d.RemoveRenderer(renderer_3d)
+        render_window_3d.AddRenderer(mesh_renderer)
+        
+        ctrl.view_update_2d()
+        ctrl.view_update_3d()
+    else:
+        # Khôi phục hiển thị khi thoát chế độ create model
+        mesh_actor.SetVisibility(False)
+
+        render_window_3d.RemoveRenderer(mesh_renderer)
+        render_window_3d.AddRenderer(renderer_3d)
+        
+        ctrl.view_update_2d()
+        ctrl.view_update_3d()
+
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

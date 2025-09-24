@@ -32,7 +32,7 @@ with SinglePageLayout(server, drawer = None) as layout:
     # Main content with custom structure
     with layout.content:
         # Custom toolbar placed right below the title
-        with vuetify.VToolbar(flat=True, dense=True, style="border-bottom: 1px solid #e0e0e0; margin-bottom: 16px;"):
+        with vuetify.VToolbar(flat=True, dense=True, style="border-bottom: 1px solid #e0e0e0; margin-bottom: 16px;", v_if=("data_loaded")):
             # File menu
             with vuetify.VMenu(offset_y=True, open_on_hover=True):
                 with vuetify.Template(v_slot_activator="{ on, attrs }"):
@@ -48,10 +48,12 @@ with SinglePageLayout(server, drawer = None) as layout:
                     vuetify.VListItem(
                         "new series",
                         click=ctrl.upload_new_series,
+                        style = "font-size: 14px;"
                     )
                     vuetify.VListItem(
                         "export mesh",
                         click="export_dialog = true",
+                        style = "font-size: 14px;"
                     )
             
             # View menu
@@ -67,15 +69,15 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                 with vuetify.VList(dense=True):
                     with vuetify.VList(v_model=("current_view", "axial"), classes="ma-2"):
-                        vuetify.VListItem("axial", value="axial", click = "current_view = 'axial'", active_class="primary--text")
-                        vuetify.VListItem("sagittal", value="sagittal", click = "current_view = 'sagittal'", active_class="primary--text")
-                        vuetify.VListItem("coronal", value="coronal", click = "current_view = 'coronal'", active_class="primary--text")
+                        vuetify.VListItem("axial", value="axial", click = "current_view = 'axial'", active_class="primary--text", style = "font-size: 14px;")
+                        vuetify.VListItem("sagittal", value="sagittal", click = "current_view = 'sagittal'", active_class="primary--text", style = "font-size: 14px;")
+                        vuetify.VListItem("coronal", value="coronal", click = "current_view = 'coronal'", active_class="primary--text", style = "font-size: 14px;")
 
             # Edit menu
             with vuetify.VMenu(offset_y=True, open_on_hover=True):
                 with vuetify.Template(v_slot_activator="{ on, attrs }"):
                     vuetify.VBtn(
-                        "Edit",
+                        "Model",
                         v_bind="attrs",
                         v_on="on",
                         text=True,
@@ -84,8 +86,14 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                 with vuetify.VList(dense=True):
                     vuetify.VListItem(
-                        "pick point",
-                        click="point_picking_mode = true; point_picking_enabled = true",
+                        "create model",
+                        click = "point_picking_mode = false; point_picking_enabled = false, create_model_mode = true",
+                        style = "font-size: 14px;"
+                    )
+                    vuetify.VListItem(
+                        "reconstruct",
+                        click="point_picking_mode = true; point_picking_enabled = true, create_model_mode = false",
+                        style = "font-size: 14px;"
                     )
         
         # Dialog for export mesh
@@ -150,7 +158,7 @@ with SinglePageLayout(server, drawer = None) as layout:
             classes="pa-0 fill-height",
         ):
             # Normal layout (2 columns)
-            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode",)):
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode && !create_model_mode",)):
                 # Left column - 2D view with controls
                 with vuetify.VCol(cols=6, classes="pa-2 d-flex flex-column"):
                     # 2D View
@@ -232,7 +240,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                         ctrl.view_update_3d = view_3d.update
                         ctrl.on_server_ready.add(view_3d.update)
 
-            # Point picking layout (3 columns)
+            # Reconstruct layout (3 columns)
             with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("point_picking_mode",)):
                 # DICOM view (3 columns)
                 with vuetify.VCol(cols=5, classes="pa-2 d-flex flex-column"):
@@ -320,7 +328,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                             with vuetify.VBtn(
                                 icon=True,
                                 dark=True,
-                                click="point_picking_mode = false; point_picking_enabled = false",
+                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false",
                                 classes="ml-2",
                                 small=True,
                             ): 
@@ -341,7 +349,6 @@ with SinglePageLayout(server, drawer = None) as layout:
                                     style="height: 100%;",
                                     classes="point-table",
                                 )
-                                
 
                         # Button actions with improved layout
                         with vuetify.VCardActions(classes="pa-2 pt-0"):
@@ -429,6 +436,96 @@ with SinglePageLayout(server, drawer = None) as layout:
                                         block=True,
                                         color="primary",
                                         disabled=("!picked_points || picked_points.length === 0",),
+                                        style="font-size: 11px;",
+                                    )
+
+            # Create model layout
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("create_model_mode",)):
+                # Windows containing mesh
+                with vuetify.VCol(cols=9, classes="pa-0 d-flex flex-column"):
+                    with vuetify.VCard(classes="flex-grow-1"):
+                        view_3d = vtk.VtkRemoteView(
+                            render_window_3d,
+                            interactor=interactor_3d,
+                            style="width: 100%; height: 100%;",
+                        )
+                        ctrl.view_update_3d = view_3d.update
+                # Functioning part
+                with vuetify.VCol(cols=3, classes="pa-0 d-flex flex-column"):
+                    with vuetify.VCard(classes="d-flex flex-column", style="height: 100%;"):
+                        with vuetify.VCardTitle(classes="py-2 primary white--text d-flex align-center"):
+                            vuetify.VIcon("mdi-map-marker", left=True, dark=True)
+                            vuetify.VCardTitle("Vertices Management", classes="text-body-1 white--text")
+                            vuetify.VSpacer()
+                            with vuetify.VBtn(
+                                icon=True,
+                                dark=True,
+                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false",
+                                classes="ml-2",
+                                small=True,
+                            ): 
+                                vuetify.VIcon("mdi-close")
+                        
+                        # Point list with fixed height
+                        with vuetify.VCardText(classes="pa-2 flex-grow-1", style="overflow-y: auto; height: calc(100% - 120px);"):
+                            with vuetify.VContainer(fluid=True, style="height: 400px;"):
+                                vuetify.VDataTable(
+                                    headers=("header",),
+                                    items=("picked_vertices",),
+                                    v_model=("selected_vertices", []),
+                                    item_key="name",
+                                    show_select=True,
+                                    hide_default_footer=True,
+                                    dense=True,
+                                    height="100%",
+                                    style="height: 100%;",
+                                    classes="point-table",
+                                )
+                                
+
+                        # Button actions with improved layout
+                        with vuetify.VCardActions(classes="pa-2 pt-0"):
+                            with vuetify.VContainer(fluid=True, classes="pa-0"):
+                                with vuetify.VRow(dense=True, no_gutters=True):
+                                    with vuetify.VCol(cols=6, classes="pr-1"):
+                                        vuetify.VBtn(
+                                            "Del Sel",
+                                            click= "",
+                                            small=True,
+                                            block=True,
+                                            color="error",
+                                            disabled=("!selected_vertices || selected_vertices.length === 0",),
+                                            style="font-size: 11px;",
+                                        )
+                                    with vuetify.VCol(cols=6, classes="pl-1"):
+                                        vuetify.VBtn(
+                                            "Del All",
+                                            click="",
+                                            small=True,
+                                            block=True,
+                                            color="error",
+                                            disabled=("!picked_vertices || picked_vertices.length === 0",),
+                                            style="font-size: 11px;",
+                                        )
+                                
+                                with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
+                                    vuetify.VBtn(
+                                        "Train",
+                                        small=True,
+                                        block=True,
+                                        color="success",
+                                        disabled=("!picked_vertices || picked_vertices.length === 0",),
+                                        style="font-size: 11px;",
+                                        click="",
+                                    )
+                                with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
+                                    vuetify.VBtn(
+                                        "Save",
+                                        click="",
+                                        small=True,
+                                        block=True,
+                                        color="primary",
+                                        disabled=("!picked_vertices || picked_vertices.length === 0",),
                                         style="font-size: 11px;",
                                     )
 
