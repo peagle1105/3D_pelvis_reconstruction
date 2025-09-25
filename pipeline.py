@@ -14,7 +14,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkVolumeProperty,
     vtkColorTransferFunction,
 )
-from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkPLYReader
+from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkPLYReader, vtkTransform
 from vtkmodules.vtkIOImage import vtkDICOMImageReader
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleImage
 from vtkmodules.vtkInteractionImage import vtkImageViewer2
@@ -32,6 +32,7 @@ from tools.file_handler import load_files, load_zip_file, export_mesh
 from tools.plane import Plane
 from tools.view import View
 from tools.point_picker import PointPickingTool
+from tools.mesh import Mesh
 
 #---------------------------------------------------------
 # Define constant
@@ -103,10 +104,11 @@ renderer_2d.SetBackground(0,0,0)
 
 # Create separate render windows
 render_window_3d = vtkRenderWindow()
-render_window_3d.AddRenderer(renderer_3d)
 
 render_window_2d = vtkRenderWindow()
 render_window_2d.AddRenderer(renderer_2d)
+
+mesh_renderer = vtkRenderer()
 
 # Create interactors with different styles
 interactor_3d = vtkRenderWindowInteractor()
@@ -152,7 +154,7 @@ renderer_3d.AddActor(plane_actor)
 
 # ===== Mesh =====
 mesh_source = vtkPLYReader()
-mesh_source.SetFileName(f"{train_path}/{file_sample_mesh}")  # Thay bằng đường dẫn file của bạn
+mesh_source.SetFileName(f"{train_path}/{file_sample_mesh}")
 mesh_source.Update()
 
 # Mapper và Actor
@@ -162,8 +164,12 @@ mesh_mapper.SetInputConnection(mesh_source .GetOutputPort())
 mesh_actor = vtkActor()
 mesh_actor.SetMapper(mesh_mapper)
 
-# Renderer
-mesh_renderer = vtkRenderer()
+transform = vtkTransform()
+transform.Scale(1000, 1000, 1000)
+
+# Áp transform vào actor
+mesh_actor.SetUserTransform(transform)
+
 mesh_renderer.AddActor(mesh_actor)
 mesh_renderer.ResetCamera()
 #---------------------------------------------------------
@@ -217,6 +223,15 @@ point_picker = PointPickingTool(
     get_dicom_reader_callback=get_dicom_reader
 )
 
+# ===== Mesh picking point =====
+mesh_point_picker = Mesh(
+    ctrl= ctrl,
+    state= state,
+    mesh_renderer= mesh_renderer,
+    sphere_actor= sphere_actor,
+    interactor_3d= interactor_3d  # THÊM interactor_3d
+)
+
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
 
@@ -230,6 +245,9 @@ ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
+## create model
+ctrl.add("delete_selected_vertices")(mesh_point_picker.delete_selected_vertices)
+ctrl.add("delete_all_vertices")(mesh_point_picker.delete_all_vertices)
 ## upload new series
 @ctrl.add("upload_new_series")
 def upload_new_series():
@@ -399,18 +417,49 @@ def on_create_model_mode(create_model_mode, **kwargs):
         mesh_actor.SetVisibility(True)
         render_window_3d.RemoveRenderer(renderer_3d)
         render_window_3d.AddRenderer(mesh_renderer)
+
+        mesh_point_picker.enable_point_picking_3d()
+        mesh_point_picker.color_change_pick_points()
         
         ctrl.view_update_2d()
         ctrl.view_update_3d()
     else:
         # Khôi phục hiển thị khi thoát chế độ create model
         mesh_actor.SetVisibility(False)
-
         render_window_3d.RemoveRenderer(mesh_renderer)
         render_window_3d.AddRenderer(renderer_3d)
         
+        mesh_point_picker.disable_point_picking_3d()
+        mesh_point_picker.hide_pick_points()
+
         ctrl.view_update_2d()
         ctrl.view_update_3d()
+
+@state.change("picked_vertices")
+def on_picked_vertices_change(**kwargs):
+    if state.create_model_mode:
+        mesh_point_picker.recreate_all_points()
+    
+    ctrl.view_update_2d()
+    ctrl.view_update_3d()
+
+@state.change("selected_vertices")
+def on_selected_vertiecs_change(selected_vertices, **kwargs):
+    selected_names = selected_vertices if selected_vertices else []
+    updated_vertices = []
+    picked_vertices = state.picked_vertices if state.picked_vertices else []
+    # Cập nhật thuộc tính `selected` trong picked_points
+    for vertex in picked_vertices:
+        vertex_copy = vertex.copy()
+        vertex_copy["selected"] = vertex["name"] in selected_names
+        updated_vertices.append(vertex_copy)
+    
+    # Gán lại picked_points để kích hoạt reactivity
+    state.picked_vertices = updated_vertices
+    
+    # Update selected spheres
+    mesh_point_picker.create_selected_sphere()
+    ctrl.view_update_3d()
 
 #---------------------------------------------------------
 # VTK Pipeline

@@ -510,7 +510,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                                     with vuetify.VCol(cols=6, classes="pr-1"):
                                         vuetify.VBtn(
                                             "Del Sel",
-                                            click= "",
+                                            click= ctrl.delete_selected_vertices,
                                             small=True,
                                             block=True,
                                             color="error",
@@ -520,7 +520,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                                     with vuetify.VCol(cols=6, classes="pl-1"):
                                         vuetify.VBtn(
                                             "Del All",
-                                            click="",
+                                            click=ctrl.delete_all_vertices,
                                             small=True,
                                             block=True,
                                             color="error",
