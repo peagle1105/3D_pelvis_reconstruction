@@ -8,7 +8,7 @@ class Mouse:
         self.sphere_actor = sphere_actor
         self.get_dicom_reader = get_dicom_reader_callback
         self.picker = vtkWorldPointPicker()  # Thêm picker để chuyển đổi tọa độ chính xác
-
+    
     def on_mouse_move(self, obj, event):
         if not self.state.point_picking_enabled:
             return

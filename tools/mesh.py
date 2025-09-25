@@ -196,7 +196,6 @@ class Mesh:
     # ===== Main function =====
     def on_click_3d(self, obj, event):
         """Handle click on 3D view"""
-        # ✅ Sửa điều kiện kiểm tra
         if not self.state.create_model_mode:
             return
 
@@ -216,14 +215,13 @@ class Mesh:
             return
             
         world_point = self.picker_3d.GetPickPosition()
-        print(f"✅ Picked point at {world_point} in 3D view")
 
         # Add point to the list and select it
         point_name = self.add_point(world_point, "3D", select=True)
         
         # Update selected points and refresh UI
         self.update_selected_points()
-        self.recreate_all_points()  # ✅ Sử dụng hàm recreate thay vì color_change
+        self.recreate_all_points()
 
         # Update sphere position
         self.sphere_actor.SetPosition(world_point)
