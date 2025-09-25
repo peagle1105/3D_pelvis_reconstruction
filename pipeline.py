@@ -84,7 +84,8 @@ state.picked_points_content = ""  # Content to be saved in the file
 state.export_dialog = False
 state.file_content = ""  # Content of the uploaded .pp file
 state.file_mesh_name = ""
-state.file_mesh_extend = "PLY"
+state.file_mesh_extend = "ply"
+state.mesh_content = None
 
 state.create_model_mode = False
 state.picked_vertices = []
@@ -229,18 +230,6 @@ ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
-## export mesh
-@ctrl.add("save_file")
-def save_file(**kwargs):
-    export_mesh(
-        ctrl= ctrl,
-        mesh = mesh_source.GetOutput(),
-        file_name= state.file_mesh_name,
-        extend= state.file_mesh_extend,
-    )
-    state.export_dialog = False
-## create model
-
 ## upload new series
 @ctrl.add("upload_new_series")
 def upload_new_series():
@@ -396,17 +385,11 @@ def on_file_content_change(file_content, **kwargs):
         # Reset state sau khi xử lý
         state.file_content = None
 
-# # ===== Export mesh =====
-# @state.change("export_dialog")
-# def on_dialog_change(export_dialog, **kwargs):
-#     if export_dialog:
-#         print()
-#     else:
-#         print("Dialog closed")
-
-@state.change("file_mesh_name")
-def on_name_change(file_mesh_name, **kwargs):
-    print("Name changed to:", repr(file_mesh_name))
+# ===== Export mesh =====
+@state.change("file_mesh_extend")
+def on_dialog_change(export_dialog, **kwargs):
+    if export_dialog:
+        state.mesh_content = export_mesh(state, mesh_source.GetOutput())
 
 # ===== Create model =====
 @state.change("create_model_mode")

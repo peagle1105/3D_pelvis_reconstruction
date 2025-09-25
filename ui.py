@@ -125,8 +125,14 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VSelect(
                         label="File format",
-                        v_model=("file_mesh_extend","PLY"),
-                        items=("['PLY', 'OBJ', 'STL']",),
+                        v_model=("file_mesh_extend", "ply"),
+                        items=(
+                            [
+                                {"text": "Pointcloud (PLY)", "value": "ply"},
+                                {"text": "Object (OBJ)", "value": "obj"}, 
+                                {"text": "Stereolithography (STL)", "value": "stl"}
+                            ],
+                        ),
                         hide_details=True,
                         outlined=True,
                         dense=True,
@@ -146,7 +152,20 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VBtn(
                         "Save", 
-                        click= ctrl.save_file(),
+                        click=(
+                            "const content = mesh_content;"
+                            "const fileName = file_mesh_name + '.' + file_mesh_extend ;"
+                            "const blob = new Blob([content], { type: 'text/plain' });"
+                            "const url = URL.createObjectURL(blob);"
+                            "const link = document.createElement('a');"
+                            "link.href = url;"
+                            "link.download = fileName;"
+                            "document.body.appendChild(link);"
+                            "link.click();"
+                            "document.body.removeChild(link);"
+                            "URL.revokeObjectURL(url);"
+                            "export_message = '✅ Đã tải về thành công!';"
+                        ),
                         disabled=(" file_mesh_name == '' ",),
                         color="primary",
                         depressed=True

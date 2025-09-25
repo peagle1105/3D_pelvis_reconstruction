@@ -8,6 +8,85 @@ import tempfile
 
 temp_path = "./temp_folder/"
 
+# Sub-function
+def get_ply_content(mesh_data):
+    try:
+        # Sử dụng vtkPLYWriter với StringIO
+        ply_writer = vtk.vtkPLYWriter()
+        ply_writer.SetFileTypeToASCII()
+        ply_writer.SetInputData(mesh_data)
+        
+        with tempfile.NamedTemporaryFile(suffix='.ply', delete=False, mode='w') as temp_file:
+            temp_filename = temp_file.name
+        
+        ply_writer.SetFileName(temp_filename)
+        ply_writer.Write()
+        
+        # Đọc nội dung file
+        with open(temp_filename, 'r') as f:
+            content = f.read()
+        
+        # Xóa file tạm
+        os.unlink(temp_filename)
+        return content
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+def get_obj_content(mesh_data):
+    try:
+        # Sử dụng vtkOBJWriter
+        obj_writer = vtk.vtkOBJWriter()
+        obj_writer.SetInputData(mesh_data)
+        
+        with tempfile.NamedTemporaryFile(suffix='.obj', delete=False, mode='w') as temp_file:
+            temp_filename = temp_file.name
+        
+        obj_writer.SetFileName(temp_filename)
+        obj_writer.Write()
+        
+        # Đọc nội dung file
+        with open(temp_filename, 'r') as f:
+            content = f.read()
+        
+        # Xóa file tạm
+        os.unlink(temp_filename)
+        return content
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+def get_stl_content(mesh_data, ascii_format=True):
+    try:
+        # Sử dụng vtkSTLWriter
+        stl_writer = vtk.vtkSTLWriter()
+        stl_writer.SetInputData(mesh_data)
+        
+        # Chọn định dạng ASCII hoặc Binary
+        if ascii_format:
+            stl_writer.SetFileTypeToASCII()
+        else:
+            stl_writer.SetFileTypeToBinary()
+
+        with tempfile.NamedTemporaryFile(suffix='.stl', delete=False, mode='w') as temp_file:
+            temp_filename = temp_file.name
+        
+        stl_writer.SetFileName(temp_filename)
+        stl_writer.Write()
+        
+        # Đọc nội dung file
+        mode = 'r' if ascii_format else 'rb'
+        with open(temp_filename, mode) as f:
+            content = f.read()
+        
+        # Xóa file tạm
+        os.unlink(temp_filename)
+        return content
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+# Main function
 def load_files(temp_path, file_list):
     """Save uploaded files to temporary directory"""
 
@@ -123,50 +202,14 @@ def load_zip_file(temp_path, zip_file):
         print(f"❌ Lỗi khi giải nén: {e}")
         return False
 
-def export_mesh(ctrl, mesh, file_name, extend):
-    """
-    Export mesh and trigger browser download — NO physical file saved.
-    
-    Parameters:
-    - mesh: vtk.vtkPolyData
-    - file_name: str, base name (without extension), e.g., "my_mesh"
-    - extend: str, one of "PLY", "OBJ", "STL"
-    """
-    if not hasattr(mesh, "GetNumberOfPoints"):
-        raise TypeError("Input mesh must be a vtkPolyData object.")
-
-    # Tạo đường dẫn tạm (chỉ để VTK ghi vào — sẽ đọc lại và xóa ngay)
-    suffix = f".{extend.lower()}"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        # Chọn writer theo định dạng
-        match extend.upper():
-            case "PLY":
-                writer = vtk.vtkPLYWriter()
-                writer.SetFileName(tmp_path)
-                writer.SetInputData(mesh)
-                writer.SetFileTypeToBinary()  # hoặc SetFileTypeToASCII()
-                mime_type = "application/octet-stream"
-
-            case "OBJ":
-                writer = vtk.vtkOBJWriter()
-                writer.SetFileName(tmp_path)
-                writer.SetInputData(mesh)
-                # OBJ không hỗ trợ binary trong VTK → luôn là ASCII
-                mime_type = "text/plain"
-
-            case "STL":
-                writer = vtk.vtkSTLWriter()
-                writer.SetFileName(tmp_path)
-                writer.SetInputData(mesh)
-                writer.SetFileTypeToBinary()
-                mime_type = "application/octet-stream"
-
-            case _:
-                raise ValueError(f"Unsupported format: {extend}. Use 'PLY', 'OBJ', or 'STL'.")
-
-    except Exception as e:
-        print(f"❌ Export failed: {e}")
-        raise e
+def export_mesh(state, mesh_data):
+    match state.file_mesh_extend:
+        case 'ply':
+            content = get_ply_content(mesh_data= mesh_data)
+        case 'obj':
+            content = get_obj_content(mesh_data= mesh_data)
+        case 'stl':
+            content = get_stl_content(mesh_data= mesh_data)
+        case _:
+            content = None
+    return content
