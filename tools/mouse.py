@@ -4,10 +4,10 @@ class Mouse:
     def __init__(self, control, state, renderer_2d, sphere_actor, get_dicom_reader_callback) -> None:
         self.ctrl = control
         self.state = state
-        self.renderer_2d = renderer_2d  # Đảm bảo đây là vtkRenderer của viewport 2D
+        self.renderer_2d = renderer_2d
         self.sphere_actor = sphere_actor
         self.get_dicom_reader = get_dicom_reader_callback
-        self.picker = vtkWorldPointPicker()  # Thêm picker để chuyển đổi tọa độ chính xác
+        self.picker = vtkWorldPointPicker()
     
     def on_mouse_move(self, obj, event):
         if not self.state.point_picking_enabled:

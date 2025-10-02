@@ -130,6 +130,7 @@ class Mesh:
         text_property.SetFontSize(8)
         text_property.SetColor(0, 0, 0)  # White color
         text_property.SetBackgroundColor(1, 1, 1)  # Black background
+        text_property.SetBackgroundOpacity(1)
         
         self.mesh_renderer.AddActor(label_actor)
         self.label_actors.append(label_actor)
