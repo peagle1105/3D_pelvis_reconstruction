@@ -133,7 +133,7 @@ class PointPickingTool:
             point_slice_index = int(round((z - origin[2]) / spacing[2]))
             show_marker = (point_slice_index == self.state.slice_index)
             # Position marker at the point's x,y coordinates
-            marker_actor.SetPosition(x, y, z)
+            marker_actor.SetPosition(x, y, z)  
 
         elif orientation == "sagittal":
             point_slice_index = int(round((x - origin[0]) / spacing[0]))
@@ -171,6 +171,12 @@ class PointPickingTool:
         
         normal_color = (1.0, 1.0, 0.0)  # Yellow color for normal points
         selected_color = (1.0, 0.0, 0.0)  # Red color for selected points
+
+        # Xóa các marker 2D cũ trước khi tạo lại
+        for actor in self.marker_2d_actors:
+            self.renderer_2d.RemoveActor(actor)
+        self.marker_2d_actors.clear()
+        self.marker_2d_data.clear()
 
         # Add spheres and labels for each picked point
         for point in self.state.picked_points:
