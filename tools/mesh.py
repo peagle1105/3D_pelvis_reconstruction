@@ -142,13 +142,13 @@ class Mesh:
         for actor in self.selected_sphere_actors:
             self.mesh_renderer.RemoveActor(actor)
         self.selected_sphere_actors.clear()
-        
-        for point in self.state.selected_points:
-            if point or all(key in point for key in ['x', 'y', 'z']):
+
+        for vertex in self.state.selected_vertices:
+            if vertex and all(key in vertex for key in ['x', 'y', 'z']):
                 try:
-                    x, y, z = float(point["x"]), float(point["y"]), float(point["z"])
-                    
-                    # Create a sphere at the point location
+                    x, y, z = float(vertex["x"]), float(vertex["y"]), float(vertex["z"])
+
+                    # Create a sphere at the vertex location
                     sphere_source = vtkSphereSource()
                     sphere_source.SetRadius(3)  # Larger radius for selected points
                     sphere_source.SetCenter(x, y, z)
@@ -163,7 +163,7 @@ class Mesh:
                     
                     # Set color for selected points (red)
                     sphere_actor.GetProperty().SetColor(1.0, 0.0, 0.0)
-                    sphere_actor.GetProperty().SetOpacity(0.7)
+                    sphere_actor.GetProperty().SetOpacity(1.0)
                     
                     self.mesh_renderer.AddActor(sphere_actor)
                     self.selected_sphere_actors.append(sphere_actor)

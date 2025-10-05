@@ -536,7 +536,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                                         color="success",
                                         disabled=("!picked_vertices || picked_vertices.length === 0",),
                                         style="font-size: 11px;",
-                                        click="",
+                                        click="show_train_dialog = true",
                                     )
                                 with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
                                     vuetify.VBtn(
@@ -548,6 +548,204 @@ with SinglePageLayout(server, drawer = None) as layout:
                                         disabled=("!picked_vertices || picked_vertices.length === 0",),
                                         style="font-size: 11px;",
                                     )
+
+        # Train model dialog
+        with vuetify.VDialog(v_model=("show_train_dialog", False), width="500", persistent=True):
+            with vuetify.VCard():
+                with vuetify.VCardTitle(
+                    "Train Model", 
+                    classes="text-h5 grey lighten-2 d-flex justify-space-between align-center",
+                    style="padding: 16px;"
+                ):
+                    vuetify.VIcon("mdi-cog", color="primary", style="font-size: 24px;")
+                    vuetify.VSpacer()
+                    vuetify.VIcon(
+                        "mdi-close", 
+                        click="show_train_dialog = false",
+                        style="cursor: pointer;"
+                    )
+
+                with vuetify.VCardText(classes="pa-4"):
+                    vuetify.VTextField(
+                        label="Epochs",
+                        v_model_number=("train_epochs", 100),
+                        hide_details=True,
+                        outlined=True,
+                        dense=True,
+                        placeholder="Enter number of epochs",
+                        prepend_icon="mdi-timer-sand",
+                        classes="mb-4"
+                    )
+                    vuetify.VTextField(
+                        label="Learning Rate",
+                        v_model_number=("learning_rate", 0.001),
+                        hide_details=True,
+                        outlined=True,
+                        dense=True,
+                        placeholder="Enter learning rate",
+                        prepend_icon="mdi-speedometer",
+                        classes="mb-2"
+                    )
+                with vuetify.VCardText(classes="pa-4 pt-0"):
+                    vuetify.VTextField(
+                        label="Number of components",
+                        v_model_number=("n_components", 5),
+                        hide_details=True,
+                        outlined=True,
+                        dense=True,
+                        placeholder="Enter number of components",
+                        prepend_icon="mdi-shape",
+                        classes="mb-2"
+                    )
+
+                vuetify.VDivider()
+                
+                with vuetify.VCardActions(classes="pa-4 d-flex justify-end"):
+                    vuetify.VBtn(
+                        "Cancel", 
+                        click="show_train_dialog = false",
+                        color="grey",
+                        text=True,
+                        classes="mr-2",
+                    )
+                    vuetify.VBtn(
+                        "Start Training", 
+                        click="""
+                            show_train_dialog = false;
+                            show_status_dialog = true;
+                            train_data_status = 'processing';
+                            train_model_status = 'idle';
+                            $ctrl.train_model();
+                        """,
+                        color="primary",
+                        depressed=True
+                    )
+        # Status dialog
+        with vuetify.VDialog(v_model=("show_status_dialog", False), width="500", persistent=True):
+            with vuetify.VCard():
+                with vuetify.VCardTitle(
+                    "Training Status", 
+                    classes="text-h5 grey lighten-2 d-flex justify-space-between align-center",
+                    style="padding: 16px;"
+                ):
+                    vuetify.VIcon("mdi-progress-clock", color="primary", style="font-size: 24px;")
+                    vuetify.VSpacer()
+                    vuetify.VIcon(
+                        "mdi-close", 
+                        click="show_status_dialog = false",
+                        style="cursor: pointer;"
+                    )
+
+                with vuetify.VCardText(classes="pa-4"):
+                    # Trạng thái xử lý dữ liệu
+                    with vuetify.VRow(classes="mb-4"):
+                        with vuetify.VCol(cols=12):
+                            vuetify.VProgressCircular(
+                                indeterminate=True,
+                                size=20,
+                                color="primary",
+                                v_show="train_data_status === 'processing'"
+                            )
+                            vuetify.VIcon(
+                                "mdi-check-circle",
+                                color="green",
+                                v_show="train_data_status === 'success'",
+                                style="font-size: 20px; margin-right: 8px;"
+                            )
+                            vuetify.VIcon(
+                                "mdi-alert-circle",
+                                color="red",
+                                v_show="train_data_status === 'error'",
+                                style="font-size: 20px; margin-right: 8px;"
+                            )
+                            vuetify.VCardTitle("Data Processing", classes="text-subtitle-1 pa-0")
+                            vuetify.VCardText(
+                                "{{ train_data_status_text }}",
+                                classes="text-body-2"
+                            )
+                            
+
+                    # Trạng thái train model
+                    with vuetify.VRow():
+                        with vuetify.VCol(cols=12):
+                            vuetify.VProgressCircular(
+                                indeterminate=True,
+                                size=20,
+                                color="primary",
+                                v_show="train_model_status === 'training'"
+                            )
+                            vuetify.VIcon(
+                                "mdi-check-circle",
+                                color="green",
+                                v_show="train_model_status === 'success'",
+                                style="font-size: 20px; margin-right: 8px;"
+                            )
+                            vuetify.VIcon(
+                                "mdi-alert-circle",
+                                color="red",
+                                v_show="train_model_status === 'error'",
+                                style="font-size: 20px; margin-right: 8px;"
+                            )
+                            vuetify.VCardTitle("Model Training", classes="text-subtitle-1 pa-0")
+                            vuetify.VCardText(
+                                "{{ train_model_status_text }}",
+                                classes="text-body-2"
+                            )
+
+                vuetify.VDivider()
+
+                with vuetify.VCardActions(classes="pa-4 d-flex justify-space-between"):
+                    vuetify.VBtn(
+                        "Cancel",
+                        click="show_status_dialog = false",
+                        color="grey",
+                        text=True
+                    )
+                    vuetify.VBtn(
+                        "Tune Parameters",
+                        click="""
+                            show_status_dialog = false;
+                            show_train_dialog = true;
+                        """,
+                        color="secondary",
+                        outlined=True
+                    )
+                    vuetify.VBtn(
+                        "Save Model",
+                        click=ctrl.save_model,
+                        color="primary",
+                        depressed=True,
+                        disabled=("train_model_status !== 'success'",),
+                        v_show="train_model_status === 'success'"
+                    )
+                # Performance metrics after training
+                with vuetify.VCardText(classes="pa-4", v_show="train_model_status === 'success'"):
+                    vuetify.VSubheader("Evaluation Metrics", classes="text-subtitle-1 mb-2")
+
+                    # Accuracy
+                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
+                        vuetify.VCol("Accuracy:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ (eval_accuracy * 100).toFixed(2) }}%", cols=6, classes="text-right")
+
+                    # Precision
+                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
+                        vuetify.VCol("Precision:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ (eval_precision * 100).toFixed(2) }}%", cols=6, classes="text-right")
+
+                    # Recall
+                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
+                        vuetify.VCol("Recall:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ (eval_recall * 100).toFixed(2) }}%", cols=6, classes="text-right")
+
+                    # F1 Score
+                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
+                        vuetify.VCol("F1 Score:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ (eval_f1 * 100).toFixed(2) }}%", cols=6, classes="text-right")
+
+                    # Loss
+                    with vuetify.VRow(no_gutters=True):
+                        vuetify.VCol("Loss:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ eval_loss.toFixed(4) }}", cols=6, classes="text-right")
 
         # Upload prompt when no data is loaded
         with vuetify.VContainer(

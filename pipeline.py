@@ -43,7 +43,7 @@ train_path = "./train_data/PersonalizedPelvisStructures/"
 file_list = os.listdir(train_path)
 file_list = [f for f in file_list if os.path.isfile(os.path.join(train_path, f)) and f.endswith("ply")]
 
-file_sample_mesh = random.choice(file_list)
+file_sample_mesh = file_list[0]
 
 path = Path(temp_path)
 os.makedirs(path, exist_ok=True)
@@ -91,6 +91,22 @@ state.mesh_content = None
 state.create_model_mode = False
 state.picked_vertices = []
 state.selected_vertices = []
+
+state.train_data_status = "idle"  # "idle", "processing", "success", "error"
+state.train_model_status = "idle"  # "idle", "training", "success", "error"
+state.show_train_dialog = False    # Dialog cài đặt ban đầu
+state.show_status_dialog = False   # Dialog hiển thị trạng thái
+state.train_epochs = 100
+state.learning_rate = 0.001
+state.n_components = 5
+state.train_data_status_text = "Preparing data..."
+state.train_model_status_text = "Waiting to start training..."
+# Metrics after training
+state.eval_accuracy = 0.0
+state.eval_precision = 0.0
+state.eval_recall = 0.0
+state.eval_f1 = 0.0
+state.eval_loss = 0.0
 
 #---------------------------------------------------------
 # Rendering setup
@@ -248,6 +264,16 @@ ctrl.add("load_points")(point_picker.load_points)
 ## create model
 ctrl.add("delete_selected_vertices")(mesh_point_picker.delete_selected_vertices)
 ctrl.add("delete_all_vertices")(mesh_point_picker.delete_all_vertices)
+## train model
+@ctrl.add("train_model")
+def train_model():
+    """Train the model with the current parameters"""
+    # Start training process
+    print("Training model...")
+@ctrl.add("save_model")
+def save_model():
+    """Save the trained model"""
+    print("Saving model...")
 ## upload new series
 @ctrl.add("upload_new_series")
 def upload_new_series():
@@ -306,6 +332,11 @@ def on_slice_change(slice_index, **kwargs):
     
     # Cập nhật sphere theo slice mới
     sphere_actor.SetVisibility(True)
+    
+    # Cập nhật markers 2D khi slice thay đổi
+    if state.point_picking_mode:
+        point_picker.update_2d_markers()
+    
     ctrl.view_update_2d()
     ctrl.view_update_3d()
 
@@ -339,6 +370,11 @@ def on_view_change(current_view, **kwargs):
         plane.update_plane_size()
         plane.update_plane_position()
         viewer_2d.SetSlice(state.slice_index)
+        
+        # Cập nhật markers 2D khi view thay đổi
+        if state.point_picking_mode:
+            point_picker.update_2d_markers()
+            
         ctrl.view_update_2d()
         ctrl.view_update_3d()
     else:
@@ -357,6 +393,7 @@ def on_point_picking_mode_change(point_picking_mode, **kwargs):
         # Enable picking and show points
         point_picker.enable_picking()
         point_picker.color_change_pick_points()
+        point_picker.update_2d_markers()
         ctrl.view_update_2d()
         ctrl.view_update_3d()
     else:
@@ -371,6 +408,7 @@ def on_picked_points_change(**kwargs):
     if state.point_picking_mode:
         point_picker.recreate_all_points()
         state.picked_points_content = point_picker.save_points()
+        point_picker.update_2d_markers()
         ctrl.view_update_3d()
 
 @state.change("selected_points")
@@ -460,6 +498,10 @@ def on_selected_vertiecs_change(selected_vertices, **kwargs):
     # Update selected spheres
     mesh_point_picker.create_selected_sphere()
     ctrl.view_update_3d()
+
+@state.change("train_epochs", "learning_rate", "n_components")
+def on_params_change(**kwargs):
+    pass  # optional
 
 #---------------------------------------------------------
 # VTK Pipeline
