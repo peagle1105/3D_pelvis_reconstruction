@@ -132,19 +132,16 @@ class PointPickingTool:
         if orientation == "axial":
             point_slice_index = int(round((z - origin[2]) / spacing[2]))
             show_marker = (point_slice_index == self.state.slice_index)
-            # Position marker at the point's x,y coordinates
-            marker_actor.SetPosition(x, y, z)  
+            marker_actor.SetPosition(x, y, z + spacing[2] * 0.2)  
 
         elif orientation == "sagittal":
             point_slice_index = int(round((x - origin[0]) / spacing[0]))
             show_marker = (point_slice_index == self.state.slice_index)
-            # Position marker at the point's y,z coordinates  
             marker_actor.SetPosition(x, y, z)
 
         elif orientation == "coronal":
             point_slice_index = int(round((y - origin[1]) / spacing[1]))
             show_marker = (point_slice_index == self.state.slice_index)
-            # Position marker at the point's x,z coordinates
             marker_actor.SetPosition(x, y, z)
         
         # Debug

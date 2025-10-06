@@ -33,6 +33,7 @@ from tools.plane import Plane
 from tools.view import View
 from tools.point_picker import PointPickingTool
 from tools.mesh import Mesh
+from tools.model import Model
 
 #---------------------------------------------------------
 # Define constant
