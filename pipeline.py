@@ -44,7 +44,7 @@ train_path = "./train_data/PersonalizedPelvisStructures/"
 file_list = os.listdir(train_path)
 file_list = [f for f in file_list if os.path.isfile(os.path.join(train_path, f)) and f.endswith("ply")]
 
-file_sample_mesh = file_list[0]
+file_sample_mesh = "TempPelvisBoneMuscles.ply"
 
 path = Path(temp_path)
 os.makedirs(path, exist_ok=True)
@@ -93,21 +93,19 @@ state.create_model_mode = False
 state.picked_vertices = []
 state.selected_vertices = []
 
+state.template_mesh = None
 state.train_data_status = "idle"  # "idle", "processing", "success", "error"
 state.train_model_status = "idle"  # "idle", "training", "success", "error"
 state.show_train_dialog = False    # Dialog cài đặt ban đầu
 state.show_status_dialog = False   # Dialog hiển thị trạng thái
 state.train_epochs = 100
 state.learning_rate = 0.001
-state.n_components = 5
+state.n_components = 71
 state.train_data_status_text = "Preparing data..."
 state.train_model_status_text = "Waiting to start training..."
-# Metrics after training
-state.eval_accuracy = 0.0
-state.eval_precision = 0.0
-state.eval_recall = 0.0
-state.eval_f1 = 0.0
-state.eval_loss = 0.0
+state.model_content = None
+state.eval_mse = 0.0 # Metrics after training
+
 
 #---------------------------------------------------------
 # Rendering setup
@@ -171,12 +169,13 @@ renderer_3d.AddActor(plane_actor)
 
 # ===== Mesh =====
 mesh_source = vtkPLYReader()
-mesh_source.SetFileName(f"{train_path}/{file_sample_mesh}")
+mesh_source.SetFileName(f"./train_data/{file_sample_mesh}")
 mesh_source.Update()
 
 # Mapper và Actor
 mesh_mapper = vtkPolyDataMapper()
 mesh_mapper.SetInputConnection(mesh_source .GetOutputPort())
+state.template_mesh = mesh_source.GetOutput()
 
 mesh_actor = vtkActor()
 mesh_actor.SetMapper(mesh_mapper)
@@ -249,6 +248,9 @@ mesh_point_picker = Mesh(
     interactor_3d= interactor_3d  # THÊM interactor_3d
 )
 
+# ===== Model =====
+model = Model(ctrl, state)
+
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
 
@@ -265,16 +267,6 @@ ctrl.add("load_points")(point_picker.load_points)
 ## create model
 ctrl.add("delete_selected_vertices")(mesh_point_picker.delete_selected_vertices)
 ctrl.add("delete_all_vertices")(mesh_point_picker.delete_all_vertices)
-## train model
-@ctrl.add("train_model")
-def train_model():
-    """Train the model with the current parameters"""
-    # Start training process
-    print("Training model...")
-@ctrl.add("save_model")
-def save_model():
-    """Save the trained model"""
-    print("Saving model...")
 ## upload new series
 @ctrl.add("upload_new_series")
 def upload_new_series():
@@ -504,6 +496,18 @@ def on_selected_vertiecs_change(selected_vertices, **kwargs):
 def on_params_change(**kwargs):
     pass  # optional
 
+@state.change("train_data_status")
+def train_model(train_data_status, **kwargs):
+    """Train the model with the current parameters"""
+    if train_data_status == "processing":
+        state.train_data_status_text = "Preparing data..."
+        # Start training process
+        print("Training model...")
+        model_content = model.train()
+        state.model_content = model.save_model(model_content)
+        state.train_data_status_text = "Data prepared successfully!"
+        state.train_model_status = "success"
+        state.train_model_status_text = "Model trained successfully!"
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

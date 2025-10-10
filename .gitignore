@@ -3,3 +3,5 @@ test.py
 *.pp
 temp_folder/
 train_data/PersonalizedPelvisStructures/
+train_data/Landmarks/
+/multioutput_model.pkl

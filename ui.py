@@ -486,9 +486,9 @@ with SinglePageLayout(server, drawer = None) as layout:
                             ): 
                                 vuetify.VIcon("mdi-close")
                         
-                        # Point list with fixed height
-                        with vuetify.VCardText(classes="pa-2 flex-grow-1", style="overflow-y: auto; height: calc(100% - 120px);"):
-                            with vuetify.VContainer(fluid=True, style="height: 400px;"):
+                        # Point list với bottom offset để tránh che nút
+                        with vuetify.VCardText(classes="pa-2", style="overflow-y: auto; flex: 1 1 auto; margin-bottom: 70px;"):
+                            with vuetify.VContainer(fluid=True, style="height: 100%;"):
                                 vuetify.VDataTable(
                                     headers=("header",),
                                     items=("picked_vertices",),
@@ -502,15 +502,14 @@ with SinglePageLayout(server, drawer = None) as layout:
                                     classes="point-table",
                                 )
                                 
-
-                        # Button actions with improved layout
-                        with vuetify.VCardActions(classes="pa-2 pt-0"):
+                        # Button actions - fixed tại bottom với absolute positioning
+                        with vuetify.VCardActions(classes="pa-2", style="position: absolute; bottom: 0; left: 0; right: 0; background: white; z-index: 10; border-top: 1px solid #e0e0e0;"):
                             with vuetify.VContainer(fluid=True, classes="pa-0"):
                                 with vuetify.VRow(dense=True, no_gutters=True):
                                     with vuetify.VCol(cols=6, classes="pr-1"):
                                         vuetify.VBtn(
                                             "Del Sel",
-                                            click= ctrl.delete_selected_vertices,
+                                            click=ctrl.delete_selected_vertices,
                                             small=True,
                                             block=True,
                                             color="error",
@@ -538,16 +537,6 @@ with SinglePageLayout(server, drawer = None) as layout:
                                         style="font-size: 11px;",
                                         click="show_train_dialog = true",
                                     )
-                                with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
-                                    vuetify.VBtn(
-                                        "Save",
-                                        click="",
-                                        small=True,
-                                        block=True,
-                                        color="primary",
-                                        disabled=("!picked_vertices || picked_vertices.length === 0",),
-                                        style="font-size: 11px;",
-                                    )
 
         # Train model dialog
         with vuetify.VDialog(v_model=("show_train_dialog", False), width="500", persistent=True):
@@ -564,38 +553,16 @@ with SinglePageLayout(server, drawer = None) as layout:
                         click="show_train_dialog = false",
                         style="cursor: pointer;"
                     )
-
-                with vuetify.VCardText(classes="pa-4"):
-                    vuetify.VTextField(
-                        label="Epochs",
-                        v_model_number=("train_epochs", 100),
-                        hide_details=True,
-                        outlined=True,
-                        dense=True,
-                        placeholder="Enter number of epochs",
-                        prepend_icon="mdi-timer-sand",
-                        classes="mb-4"
-                    )
-                    vuetify.VTextField(
-                        label="Learning Rate",
-                        v_model_number=("learning_rate", 0.001),
-                        hide_details=True,
-                        outlined=True,
-                        dense=True,
-                        placeholder="Enter learning rate",
-                        prepend_icon="mdi-speedometer",
-                        classes="mb-2"
-                    )
                 with vuetify.VCardText(classes="pa-4 pt-0"):
                     vuetify.VTextField(
                         label="Number of components",
-                        v_model_number=("n_components", 5),
+                        v_model_number=("n_components", 71),
                         hide_details=True,
                         outlined=True,
                         dense=True,
                         placeholder="Enter number of components",
                         prepend_icon="mdi-shape",
-                        classes="mb-2"
+                        classes="mt-4 mb-2"
                     )
 
                 vuetify.VDivider()
@@ -611,11 +578,10 @@ with SinglePageLayout(server, drawer = None) as layout:
                     vuetify.VBtn(
                         "Start Training", 
                         click="""
-                            show_train_dialog = false;
-                            show_status_dialog = true;
-                            train_data_status = 'processing';
-                            train_model_status = 'idle';
-                            $ctrl.train_model();
+                        show_train_dialog = false
+                        show_status_dialog = true
+                        train_data_status = 'processing'
+                        train_model_status = 'idle'
                         """,
                         color="primary",
                         depressed=True
@@ -637,7 +603,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
 
                 with vuetify.VCardText(classes="pa-4"):
-                    # Trạng thái xử lý dữ liệu
+                    # Processing status
                     with vuetify.VRow(classes="mb-4"):
                         with vuetify.VCol(cols=12):
                             vuetify.VProgressCircular(
@@ -663,9 +629,8 @@ with SinglePageLayout(server, drawer = None) as layout:
                                 "{{ train_data_status_text }}",
                                 classes="text-body-2"
                             )
-                            
 
-                    # Trạng thái train model
+                    # Model training status
                     with vuetify.VRow():
                         with vuetify.VCol(cols=12):
                             vuetify.VProgressCircular(
@@ -692,6 +657,15 @@ with SinglePageLayout(server, drawer = None) as layout:
                                 classes="text-body-2"
                             )
 
+                    # Performance metrics after training
+                with vuetify.VCardText(classes="pa-4", v_show="train_model_status === 'success'"):
+                    vuetify.VSubheader("Evaluation Metrics", classes="text-subtitle-1 mb-2")
+
+                    # Accuracy
+                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
+                        vuetify.VCol("MSE:", cols=6, classes="font-weight-medium")
+                        vuetify.VCol("{{ (eval_mse).toFixed(2) }} mm", cols=6, classes="text-right")
+
                 vuetify.VDivider()
 
                 with vuetify.VCardActions(classes="pa-4 d-flex justify-space-between"):
@@ -712,41 +686,23 @@ with SinglePageLayout(server, drawer = None) as layout:
                     )
                     vuetify.VBtn(
                         "Save Model",
-                        click=ctrl.save_model,
+                        click=("const content = model_content;"
+                            "const blob = new Blob([content], { type: 'text/plain' });"
+                            "const url = URL.createObjectURL(blob);"
+                            "const link = document.createElement('a');"
+                            "link.href = url;"
+                            "link.download = 'model.pkl';"
+                            "document.body.appendChild(link);"
+                            "link.click();"
+                            "document.body.removeChild(link);"
+                            "URL.revokeObjectURL(url);"
+                            "status = '✅ Đã tải về thành công!';"),
                         color="primary",
                         depressed=True,
                         disabled=("train_model_status !== 'success'",),
                         v_show="train_model_status === 'success'"
                     )
-                # Performance metrics after training
-                with vuetify.VCardText(classes="pa-4", v_show="train_model_status === 'success'"):
-                    vuetify.VSubheader("Evaluation Metrics", classes="text-subtitle-1 mb-2")
-
-                    # Accuracy
-                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
-                        vuetify.VCol("Accuracy:", cols=6, classes="font-weight-medium")
-                        vuetify.VCol("{{ (eval_accuracy * 100).toFixed(2) }}%", cols=6, classes="text-right")
-
-                    # Precision
-                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
-                        vuetify.VCol("Precision:", cols=6, classes="font-weight-medium")
-                        vuetify.VCol("{{ (eval_precision * 100).toFixed(2) }}%", cols=6, classes="text-right")
-
-                    # Recall
-                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
-                        vuetify.VCol("Recall:", cols=6, classes="font-weight-medium")
-                        vuetify.VCol("{{ (eval_recall * 100).toFixed(2) }}%", cols=6, classes="text-right")
-
-                    # F1 Score
-                    with vuetify.VRow(no_gutters=True, classes="mb-2"):
-                        vuetify.VCol("F1 Score:", cols=6, classes="font-weight-medium")
-                        vuetify.VCol("{{ (eval_f1 * 100).toFixed(2) }}%", cols=6, classes="text-right")
-
-                    # Loss
-                    with vuetify.VRow(no_gutters=True):
-                        vuetify.VCol("Loss:", cols=6, classes="font-weight-medium")
-                        vuetify.VCol("{{ eval_loss.toFixed(4) }}", cols=6, classes="text-right")
-
+                
         # Upload prompt when no data is loaded
         with vuetify.VContainer(
             v_if=("!data_loaded", True),

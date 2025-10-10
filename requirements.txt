@@ -12,11 +12,14 @@ decorator==5.2.1
 executing==2.2.0
 fonttools==4.59.0
 frozenlist==1.7.0
+future==1.0.0
 idna==3.10
 ipython==9.4.0
 ipython_pygments_lexers==1.1.1
 jedi==0.19.2
+joblib==1.5.2
 kiwisolver==1.4.8
+lightgbm==4.6.0
 matplotlib==3.10.5
 matplotlib-inline==0.1.7
 more-itertools==10.7.0
@@ -31,6 +34,7 @@ pooch==1.8.2
 prompt_toolkit==3.0.51
 propcache==0.3.2
 pure_eval==0.2.3
+pycpd==2.0.0
 pydicom==3.0.1
 Pygments==2.19.2
 pyparsing==3.2.3
@@ -38,10 +42,14 @@ python-dateutil==2.9.0.post0
 pyvista==0.45.3
 PyYAML==6.0.2
 requests==2.32.4
+rtree==1.4.1
+scikit-learn==1.7.2
+scipy==1.16.2
 scooby==0.10.1
 six==1.17.0
 stack-data==0.6.3
 standard-imghdr==3.13.0
+threadpoolctl==3.6.0
 traitlets==5.14.3
 trame==3.11.0
 trame-client==3.9.1
@@ -50,6 +58,7 @@ trame-components==2.5.0
 trame-server==3.5.0
 trame-vtk==2.9.1
 trame-vuetify==3.0.1
+trimesh==4.8.3
 typing_extensions==4.14.1
 urllib3==2.5.0
 vtk==9.4.2
