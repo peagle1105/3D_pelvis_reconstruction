@@ -1,8 +1,10 @@
 # Import system libraries
 import os
 from pathlib import Path
-import random
 import base64
+import io
+import pickle
+import numpy as np
 
 # Import trame and vtk modules
 from trame.app import get_server
@@ -14,7 +16,7 @@ from vtkmodules.vtkRenderingCore import (
     vtkVolumeProperty,
     vtkColorTransferFunction,
 )
-from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkPLYReader, vtkTransform
+from vtk import vtkPiecewiseFunction, vtkTransformPolyDataFilter, vtkCommand, vtkPLYReader, vtkTransform, vtkPolyData
 from vtkmodules.vtkIOImage import vtkDICOMImageReader
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleImage
 from vtkmodules.vtkInteractionImage import vtkImageViewer2
@@ -56,6 +58,10 @@ from config.config import (
     dicom_reader,
     renderer_2d,
 )
+template_mesh = None
+template_faces = None
+predictMesh = None
+predictMesh_no_faces = None
 
 #---------------------------------------------------------
 # Create server
@@ -106,6 +112,13 @@ state.train_model_status_text = "Waiting to start training..."
 state.model_content = None
 state.eval_mse = 0.0 # Metrics after training
 
+state.reconstruct_mode = False
+state.reconstruct_dialog_show = False
+state.model_file = None
+state.inverse_pca_components = 71
+state.show_faces = True
+state.show_muscles = True  
+state.show_bones = True
 
 #---------------------------------------------------------
 # Rendering setup
@@ -124,6 +137,8 @@ render_window_2d = vtkRenderWindow()
 render_window_2d.AddRenderer(renderer_2d)
 
 mesh_renderer = vtkRenderer()
+recon_renderer = vtkRenderer()
+recon_renderer.SetBackground(0, 0, 0)
 
 # Create interactors with different styles
 interactor_3d = vtkRenderWindowInteractor()
@@ -171,11 +186,14 @@ renderer_3d.AddActor(plane_actor)
 mesh_source = vtkPLYReader()
 mesh_source.SetFileName(f"./train_data/{file_sample_mesh}")
 mesh_source.Update()
+template_mesh = mesh_source.GetOutput()
+
+template_mesh = template_mesh
+template_faces = template_mesh.GetPolys()
 
 # Mapper và Actor
 mesh_mapper = vtkPolyDataMapper()
-mesh_mapper.SetInputConnection(mesh_source .GetOutputPort())
-state.template_mesh = mesh_source.GetOutput()
+mesh_mapper.SetInputConnection(mesh_source.GetOutputPort())
 
 mesh_actor = vtkActor()
 mesh_actor.SetMapper(mesh_mapper)
@@ -188,6 +206,18 @@ mesh_actor.SetUserTransform(transform)
 
 mesh_renderer.AddActor(mesh_actor)
 mesh_renderer.ResetCamera()
+
+# ===== Reconstructed mesh =====
+recon_mesh = vtkPolyData()
+
+recon_mapper = vtkPolyDataMapper()
+recon_mapper.SetInputData(recon_mesh)
+
+recon_actor = vtkActor()
+recon_actor.SetMapper(recon_mapper)
+
+recon_renderer.AddActor(recon_actor)
+
 #---------------------------------------------------------
 # Tools initialization
 #---------------------------------------------------------
@@ -254,20 +284,25 @@ model = Model(ctrl, state)
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
 
-# Add controller functions
-## slice
+#---------------------------------------------------------
+# Controller functions
+#---------------------------------------------------------
+# ===== Slice =====
 ctrl.add("increment_slice")(slice.increment_slice)
 ctrl.add("decrement_slice")(slice.decrement_slice)
-## point picking
+
+# ===== Point picking =====
 ctrl.add("toggle_point_picking")(lambda: setattr(state, "point_picking_enabled", not state.point_picking_enabled))
 ctrl.add("delete_selected_points")(point_picker.delete_selected_points)
 ctrl.add("delete_all_points")(point_picker.delete_all_points)
 ctrl.add("save_points")(point_picker.save_points)
 ctrl.add("load_points")(point_picker.load_points)
-## create model
+
+# ===== Create model =====
 ctrl.add("delete_selected_vertices")(mesh_point_picker.delete_selected_vertices)
 ctrl.add("delete_all_vertices")(mesh_point_picker.delete_all_vertices)
-## upload new series
+
+# ===== Upload new series =====
 @ctrl.add("upload_new_series")
 def upload_new_series():
     """Xóa toàn bộ file trong temp_folder và reset state"""
@@ -503,11 +538,152 @@ def train_model(train_data_status, **kwargs):
         state.train_data_status_text = "Preparing data..."
         # Start training process
         print("Training model...")
-        model_content = model.train()
-        state.model_content = model.save_model(model_content)
+        model_content, xScaler, yScaler, xSSM, ySSM = model.train()
+        state.model_content = model.save_model(model_content, xScaler, yScaler, xSSM, ySSM)
         state.train_data_status_text = "Data prepared successfully!"
         state.train_model_status = "success"
         state.train_model_status_text = "Model trained successfully!"
+
+# ===== Reconstruct mesh =====
+@state.change("reconstruct_mode")
+def on_reconstruct_mode_change(reconstruct_mode, model_file, **kwargs):
+    """Xử lý khi reconstruct mode thay đổi"""
+    global predictMesh, predictMesh_no_faces
+    
+    if reconstruct_mode:
+        try:
+            # Kiểm tra điều kiện tiên quyết
+            if not state.model_file:
+                state.status = "❌ No model file selected"
+                return
+                
+            if not state.picked_points or len(state.picked_points) == 0:
+                state.status = "❌ No points available for reconstruction"
+                return
+                
+            if template_faces is None:
+                state.status = "❌ Template mesh not loaded properly"
+                return
+
+        
+            # Trích xuất bytes từ dictionary
+            if isinstance(model_file, dict):
+                if 'content' in model_file:
+                    zip_bytes = model_file['content']
+                else:
+                    print(f"❌ model_file dictionary doesn't contain 'content' key. Keys: {model_file.keys()}")
+                    return
+            else:
+                zip_bytes = model_file
+            
+            # Kiểm tra kiểu dữ liệu
+            if not isinstance(zip_bytes, bytes):
+                print(f"❌ zip_bytes is not bytes, got {type(zip_bytes)}")
+                return
+                
+            print(f"✅ zip_bytes type: {type(zip_bytes)}, length: {len(zip_bytes)}")
+            
+            regression_model, xScaler, yScaler, xSSM, ySSM = model.load_model(zip_bytes)
+
+            features = []
+            if state.picked_points is not None:
+                for point in state.picked_points:
+                    x, y, z = float(point["x"]), float(point["y"]), float(point["z"])
+                    feature = [x, y, z]
+                    features.append(feature)
+                
+                features = np.array(features).flatten()
+                features = features.reshape(1, -1)
+                if (
+                    xScaler is not None and
+                    xSSM is not None and
+                    regression_model is not None and
+                    ySSM is not None and
+                    yScaler is not None
+                ):
+                    ScaledFeatures = xScaler.transform(features)
+                    PCAFeatures = xSSM.transform(ScaledFeatures)
+                    pelvisStructure = regression_model.predict(PCAFeatures)
+                    pelvisStructure = np.array(pelvisStructure)
+                    predYParams = None
+                    if pelvisStructure.size > 0:
+                        if isinstance(state.inverse_pca_components, int):
+                            predYParams = pelvisStructure.reshape(-1, state.inverse_pca_components)
+                        else:
+                            print("❌ state.inverse_pca_components is not a valid integer for reshape.")
+                    if predYParams is not None:
+                        predScaledYData = ySSM.inverse_transform(predYParams)
+                        predYData = yScaler.inverse_transform(predScaledYData)
+                        predYData = predYData.reshape(-1, 3)
+
+                        predictMesh = model.create_mesh_polydata(predYData,template_faces)
+
+                        predictMesh_no_faces = model.create_vertices_polydata(predYData)
+
+                    else:
+                        print("❌ predYParams is None, cannot inverse transform.")
+            else:
+                print("❌ One or more model components are None. Cannot perform reconstruction.")
+            
+            render_window_3d.RemoveRenderer(renderer_3d)
+            render_window_3d.AddRenderer(recon_renderer)
+        except Exception as e:
+            print(f"❌ Reconstruction error: {e}")
+            import traceback
+            traceback.print_exc()
+            state.status = f"Reconstruction error: {str(e)}"
+            # Đảm bảo quay lại renderer mặc định khi có lỗi
+            render_window_3d.RemoveRenderer(recon_renderer)
+            render_window_3d.AddRenderer(renderer_3d)
+    else:
+        # Quay lại normal renderer
+        render_window_3d.RemoveRenderer(recon_renderer)
+        render_window_3d.AddRenderer(renderer_3d)
+    
+    ctrl.view_update_3d()
+
+def update_mesh_display():
+    """Cập nhật hiển thị mesh dựa trên state.show_faces"""
+    global predictMesh, predictMesh_no_faces
+    
+    # Clear previous actors
+    recon_renderer.RemoveAllViewProps()
+    
+    if state.show_faces and predictMesh:
+        display_actor = create_actor_from_polydata(predictMesh, color=(1, 1, 1), representation="surface")
+    elif predictMesh_no_faces:
+        display_actor = create_actor_from_polydata(predictMesh_no_faces, color=(1, 1, 1), representation="points")
+    else:
+        return
+        
+    recon_renderer.AddActor(display_actor)
+    recon_renderer.ResetCamera()
+    ctrl.view_update_3d()
+
+def create_actor_from_polydata(polydata, color=(1, 1, 1), representation="surface"):
+    """Helper function to create actor from polydata"""
+    mapper = vtkPolyDataMapper()
+    mapper.SetInputData(polydata)
+
+    actor = vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetColor(*color)
+
+    if representation == "points":
+        actor.GetProperty().SetRepresentationToPoints()
+        actor.GetProperty().SetPointSize(5)
+    elif representation == "wireframe":
+        actor.GetProperty().SetRepresentationToWireframe()
+    else:
+        actor.GetProperty().SetRepresentationToSurface()
+
+    return actor
+
+@state.change("show_faces")   
+def on_show_faces_change(show_faces, **kwargs):
+    """Xử lý khi toggle show faces"""
+    if state.reconstruct_mode:
+        update_mesh_display()
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

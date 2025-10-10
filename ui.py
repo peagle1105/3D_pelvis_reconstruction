@@ -87,12 +87,12 @@ with SinglePageLayout(server, drawer = None) as layout:
                 with vuetify.VList(dense=True):
                     vuetify.VListItem(
                         "create model",
-                        click = "point_picking_mode = false; point_picking_enabled = false, create_model_mode = true",
+                        click = "point_picking_mode = false; point_picking_enabled = false, create_model_mode = true, reconstruct_mode = false",
                         style = "font-size: 14px;"
                     )
                     vuetify.VListItem(
                         "reconstruct",
-                        click="point_picking_mode = true; point_picking_enabled = true, create_model_mode = false",
+                        click="point_picking_mode = true; point_picking_enabled = true, create_model_mode = false, reconstruct_mode = false",
                         style = "font-size: 14px;"
                     )
         
@@ -178,7 +178,7 @@ with SinglePageLayout(server, drawer = None) as layout:
             classes="pa-0 fill-height",
         ):
             # Normal layout (2 columns)
-            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode && !create_model_mode",)):
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode && !create_model_mode && ! reconstruct_mode",)):
                 # Left column - 2D view with controls
                 with vuetify.VCol(cols=6, classes="pa-2 d-flex flex-column"):
                     # 2D View
@@ -260,8 +260,8 @@ with SinglePageLayout(server, drawer = None) as layout:
                         ctrl.view_update_3d = view_3d.update
                         ctrl.on_server_ready.add(view_3d.update)
 
-            # Reconstruct layout (3 columns)
-            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("point_picking_mode",)):
+            # Pick point layout (3 columns)
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("point_picking_mode && !create_model_mode && ! reconstruct_mode",)):
                 # DICOM view (3 columns)
                 with vuetify.VCol(cols=5, classes="pa-2 d-flex flex-column"):
                     with vuetify.VCard(classes="flex-grow-1", style="position: relative;"):
@@ -348,7 +348,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                             with vuetify.VBtn(
                                 icon=True,
                                 dark=True,
-                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false",
+                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false, reconstruct_mode = false",
                                 classes="ml-2",
                                 small=True,
                             ): 
@@ -451,7 +451,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                                 with vuetify.VRow(dense=True, no_gutters=True, classes="mt-1"):
                                     vuetify.VBtn(
                                         "Reconstruct",
-                                        click="",
+                                        click="reconstruct_dialog_show = true",
                                         small=True,
                                         block=True,
                                         color="primary",
@@ -460,7 +460,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                                     )
 
             # Create model layout
-            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("create_model_mode",)):
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode && create_model_mode && ! reconstruct_mode",)):
                 # Windows containing mesh
                 with vuetify.VCol(cols=9, classes="pa-0 d-flex flex-column"):
                     with vuetify.VCard(classes="flex-grow-1"):
@@ -480,7 +480,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                             with vuetify.VBtn(
                                 icon=True,
                                 dark=True,
-                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false",
+                                click="point_picking_mode = false; point_picking_enabled = false; create_model_mode = false, reconstruct_mode = false",
                                 classes="ml-2",
                                 small=True,
                             ): 
@@ -537,6 +537,121 @@ with SinglePageLayout(server, drawer = None) as layout:
                                         style="font-size: 11px;",
                                         click="show_train_dialog = true",
                                     )
+            # Reconstruct mode layout
+            with vuetify.VRow(no_gutters=True, classes="fill-height", v_if=("!point_picking_mode && !create_model_mode && reconstruct_mode",)):
+                # 3D view (9 columns)
+                with vuetify.VCol(cols=9, classes="pa-0 d-flex flex-column"):
+                    with vuetify.VCard(classes="flex-grow-1"):
+                        view_3d = vtk.VtkRemoteView(
+                            render_window_3d,
+                            interactor=interactor_3d,
+                            style="width: 100%; height: 100%;",
+                        )
+                        ctrl.view_update_3d = view_3d.update
+
+                # Control panel (3 columns)
+                with vuetify.VCol(cols=3, classes="pa-0 d-flex flex-column"):
+                    with vuetify.VCard(classes="d-flex flex-column", style="height: 100%;"):
+                        with vuetify.VCardTitle(classes="py-2 primary white--text d-flex align-center"):
+                            vuetify.VIcon("mdi-cube-outline", left=True, dark=True)
+                            vuetify.VCardTitle("Reconstruct Controls", classes="text-body-1 white--text")
+                            vuetify.VSpacer()
+                            with vuetify.VBtn(
+                                icon=True,
+                                dark=True,
+                                click="reconstruct_mode = false",
+                                classes="ml-2",
+                                small=True,
+                            ): 
+                                vuetify.VIcon("mdi-close")
+                        
+                        # Checkbox controls
+                        with vuetify.VCardText(classes="pa-4"):
+                            vuetify.VCheckbox(
+                                v_model=("show_faces", True),
+                                label="Faces",
+                                hide_details=True,
+                                dense=True,
+                            )
+                            vuetify.VCheckbox(
+                                v_model=("show_muscles", True),
+                                label="Muscles", 
+                                hide_details=True,
+                                dense=True,
+                            )
+                            vuetify.VCheckbox(
+                                v_model=("show_bones", True),
+                                label="Bones",
+                                hide_details=True, 
+                                dense=True,
+                            )
+
+        # Reconstruct dialog
+        with vuetify.VDialog(v_model=("reconstruct_dialog_show", False), width="500", persistent=True):
+            with vuetify.VCard():
+                with vuetify.VCardTitle(
+                    "Reconstruct Model", 
+                    classes="text-h5 grey lighten-2 d-flex justify-space-between align-center",
+                    style="padding: 16px;"
+                ):
+                    vuetify.VIcon("mdi-cube-outline", color="primary", style="font-size: 24px;")
+                    vuetify.VSpacer()
+                    vuetify.VIcon(
+                        "mdi-close", 
+                        click="reconstruct_dialog_show = false",
+                        style="cursor: pointer;"
+                    )
+
+                with vuetify.VCardText(classes="pa-4"):
+                    # File input for .zip file
+                    vuetify.VFileInput(
+                        label="Model File (.zip)",
+                        v_model=("model_file", None),
+                        accept=".zip",
+                        outlined=True,
+                        dense=True,
+                        hide_details=True,
+                        prepend_icon="mdi-zip-box",
+                        classes="mb-4"
+                    )
+                    
+                    # Number input for inverse PCA components
+                    vuetify.VTextField(
+                        label="Inverse PCA Components",
+                        v_model_number=("inverse_pca_components", 71),
+                        type="number",
+                        min=1,
+                        max=100,
+                        hide_details=True,
+                        outlined=True,
+                        dense=True,
+                        placeholder="Enter number of components",
+                        prepend_icon="mdi-numeric",
+                        classes="mb-2"
+                    )
+
+                vuetify.VDivider()
+                
+                with vuetify.VCardActions(classes="pa-4 d-flex justify-end"):
+                    vuetify.VBtn(
+                        "Cancel", 
+                        click="reconstruct_dialog_show = false",
+                        color="grey",
+                        text=True,
+                        classes="mr-2",
+                    )
+                    vuetify.VBtn(
+                        "Reconstruct", 
+                        click=(
+                            "reconstruct_dialog_show = false;"
+                            "reconstruct_mode = true;"
+                            "point_picking_mode = false;"
+                            "create_model_mode = false;"
+                        ),
+                        disabled=("!model_file || !inverse_pca_components",),
+                        color="primary",
+                        depressed=True
+                    )
 
         # Train model dialog
         with vuetify.VDialog(v_model=("show_train_dialog", False), width="500", persistent=True):
@@ -691,7 +806,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                             "const url = URL.createObjectURL(blob);"
                             "const link = document.createElement('a');"
                             "link.href = url;"
-                            "link.download = 'model.pkl';"
+                            "link.download = 'model.zip';"
                             "document.body.appendChild(link);"
                             "link.click();"
                             "document.body.removeChild(link);"
@@ -701,7 +816,7 @@ with SinglePageLayout(server, drawer = None) as layout:
                         depressed=True,
                         disabled=("train_model_status !== 'success'",),
                         v_show="train_model_status === 'success'"
-                    )
+                    )       
                 
         # Upload prompt when no data is loaded
         with vuetify.VContainer(

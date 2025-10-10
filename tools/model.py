@@ -12,6 +12,9 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.linear_model import RidgeCV
 from scipy.spatial import KDTree
 import joblib
+import shutil
+import zipfile
+import tempfile
 
 train_path = "./train_data/PersonalizedPelvisStructures"
 file_list = os.listdir(train_path)
@@ -255,15 +258,120 @@ class Model:
         self.state.eval_mse = mse
         print(avgP2PDists)
 
-        return model
+        return model, xScaler, yScaler, xSSM, ySSM
     
-    def save_model(self, model):
-        buffer = io.BytesIO()
-        joblib.dump(model, buffer)
-        buffer.seek(0)
-        return buffer.read()
+    def save_model(self, model, xScaler, yScaler, xSSM, ySSM):
+        temp_dir = "./temp_model_path"
+        zip_path = "./model_archive.zip"
 
+        # Bước 1: Tạo thư mục tạm
+        os.makedirs(temp_dir, exist_ok=True)
 
+        # Bước 2: Lưu các mô hình vào thư mục
+        joblib.dump(model, os.path.join(temp_dir, "model.pkl"))
+        joblib.dump(xScaler, os.path.join(temp_dir, "xScaler.pkl"))
+        joblib.dump(yScaler, os.path.join(temp_dir, "yScaler.pkl"))
+        joblib.dump(xSSM, os.path.join(temp_dir, "xSSM.pkl"))
+        joblib.dump(ySSM, os.path.join(temp_dir, "ySSM.pkl"))
 
+        # Bước 3: Nén thư mục thành file ZIP
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, temp_dir)
+                    zipf.write(file_path, arcname)
 
+        # Bước 4: Đọc nội dung file ZIP
+        with open(zip_path, "rb") as f:
+            zip_content = f.read()
+
+        # Bước 5: Xóa thư mục tạm và file ZIP
+        shutil.rmtree(temp_dir)
+        os.remove(zip_path)
+
+        return zip_content
+
+    def load_model(self, zip_bytes):
+        # Create a temple folder for extracting
+        temp_dir = tempfile.mkdtemp(prefix="model_load_")
+
+        try:
+            # Write the zip's content into temple file
+            zip_path = os.path.join(temp_dir, "model.zip")
+            with open(zip_path, "wb") as f:
+                f.write(zip_bytes)
+
+            # Extract zip
+            with zipfile.ZipFile(zip_path, "r") as zipf:
+                zipf.extractall(temp_dir)
+
+            # Check and load model
+            def load_component(name):
+                path = os.path.join(temp_dir, f"{name}.pkl")
+                if os.path.exists(path):
+                    return joblib.load(path)
+                else:
+                    print(f"[DEBUG] Thiếu file: {name}.pkl")
+                    return None
+
+            model   = load_component("model")
+            xScaler = load_component("xScaler")
+            yScaler = load_component("yScaler")
+            xSSM    = load_component("xSSM")
+            ySSM    = load_component("ySSM")
+
+            return model, xScaler, yScaler, xSSM, ySSM
+
+        finally:
+            # Delete temple file
+            shutil.rmtree(temp_dir)
+
+    def create_vertices_polydata(self, points_array) -> vtk.vtkPolyData:
+        points = vtk.vtkPoints()
+        vertices = vtk.vtkCellArray()
+
+        for i, pt in enumerate(points_array):
+            pid = points.InsertNextPoint(pt)
+            vertices.InsertNextCell(1)
+            vertices.InsertCellPoint(pid)
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetVerts(vertices)
+
+        return polydata
+
+    def create_mesh_polydata(self, points_array, faces) -> vtk.vtkPolyData :
+        points_array = np.asarray(points_array)
+        
+        # Kiểm tra shape
+        if points_array.ndim != 2 or points_array.shape[1] != 3:
+            raise ValueError(f"points_array must have shape (n, 3), got {points_array.shape}")
+        
+        points = vtk.vtkPoints()
+        for pt in points_array:
+            # Chuyển đổi sang float để đảm bảo type safety
+            x, y, z = float(pt[0]), float(pt[1]), float(pt[2])
+            points.InsertNextPoint(x, y, z)
+
+        polys = vtk.vtkCellArray()
+        
+        # Xử lý cả hai trường hợp: vtkCellArray và danh sách thông thường
+        if isinstance(faces, vtk.vtkCellArray):
+            # Nếu là vtkCellArray, sao chép trực tiếp
+            polys.DeepCopy(faces)
+        else:
+            # Nếu là danh sách thông thường, xây dựng vtkCellArray
+            for face in faces:
+                face_ids = vtk.vtkIdList()
+                for pid in face:
+                    face_ids.InsertNextId(int(pid))
+                polys.InsertNextCell(face_ids)
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetPolys(polys)
+
+        return polydata
         
