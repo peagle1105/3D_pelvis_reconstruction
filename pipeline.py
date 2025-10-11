@@ -104,6 +104,8 @@ state.train_data_status = "idle"  # "idle", "processing", "success", "error"
 state.train_model_status = "idle"  # "idle", "training", "success", "error"
 state.show_train_dialog = False    # Dialog cài đặt ban đầu
 state.show_status_dialog = False   # Dialog hiển thị trạng thái
+state.vertices = []
+state.features = []
 state.train_epochs = 100
 state.learning_rate = 0.001
 state.n_components = 71
@@ -111,6 +113,10 @@ state.train_data_status_text = "Preparing data..."
 state.train_model_status_text = "Waiting to start training..."
 state.model_content = None
 state.eval_mse = 0.0 # Metrics after training
+state.consistency_score = 0.0
+state.shape_correlation = 0.0
+state.feature_reconstruction = 0.0
+state.anatomical_sensitivity = 0.0
 
 state.reconstruct_mode = False
 state.reconstruct_dialog_show = False
@@ -572,17 +578,29 @@ def on_params_change(**kwargs):
     pass  # optional
 
 @state.change("train_data_status")
-def train_model(train_data_status, **kwargs):
+def cross_landmark(train_data_status, **kwargs):
     """Train the model with the current parameters"""
     if train_data_status == "processing":
         state.train_data_status_text = "Preparing data..."
         # Start training process
+        print("Cross-landmarking...")
+        state.vertices, state.features, performance_metrics = model.cross_landmark()
+        state.consistency_score = performance_metrics["consistency_score"]
+        state.shape_correlation = performance_metrics["shape_correlation"]
+        state.feature_reconstruction = performance_metrics["feature_reconstruction"]
+        state.anatomical_sensitivity = performance_metrics["anatomical_sensitivity"]
+        state.train_data_status = "success"
+        state.train_data_status_text = "Data prepared successfully!"
+        state.train_model_status = "processing"
+
+@state.change("train_model_status")
+def train_model(train_model_status, **kwargs):
+    if state.train_data_status == "success" and train_model_status == "processing" and state.vertices != [] and state.features != []:
         print("Training model...")
-        model_content, xScaler, yScaler, xSSM, ySSM = model.train()
+        model_content, xScaler, yScaler, xSSM, ySSM = model.train(state.vertices, state.features)
         print("Train successfully, saving...")
         state.model_content = model.save_model(model_content, xScaler, yScaler, xSSM, ySSM)
         print("Save successfully")
-        state.train_data_status_text = "Data prepared successfully!"
         state.train_model_status = "success"
         state.train_model_status_text = "Model trained successfully!"
 
@@ -788,6 +806,7 @@ def on_show_faces_change(show_faces, **kwargs):
     print(f"🔄 Thay đổi chế độ hiển thị faces: {show_faces}")
     if state.reconstruct_mode:
         update_mesh_display()
+
 #---------------------------------------------------------
 # VTK Pipeline
 #---------------------------------------------------------

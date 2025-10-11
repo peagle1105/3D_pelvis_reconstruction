@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.linear_model import RidgeCV
-from scipy.spatial import KDTree
+from scipy.spatial import KDTree, procrustes
 import joblib
 import shutil
 import zipfile
@@ -166,38 +166,336 @@ class Model:
         
         # Return buffer
         return indices
+    
+    ## Evaluation
+    def _compute_mesh_volume(self, vertices_flat: np.ndarray):
+        """ Tính thể tích của mesh. Cần thư viện mesh. """
+        # Giả định: Volume/Scale được tính toán dựa trên bounding box cho mục đích minh họa
+        # THỰC TẾ: NÊN DÙNG THỂ TÍCH HOẶC DIỆN TÍCH BỀ MẶT THỰC CỦA MESH
+        vertices_3d = vertices_flat.reshape(-1, 3)
+        min_coords = np.min(vertices_3d, axis=0)
+        max_coords = np.max(vertices_3d, axis=0)
+        size = np.prod(max_coords - min_coords)
+        return size if size > 0 else 1.0 # Trả về thể tích
+
+    def _find_nearest_vertices(self, mesh_vertices: np.ndarray, landmark_coords: np.ndarray, radius: float = 0.05):
+        """ Tìm chỉ số các đỉnh trong một bán kính R quanh một landmark. """
+        distances = np.linalg.norm(mesh_vertices - landmark_coords, axis=1)
+        return np.where(distances < radius)[0]
+
+    def compute_inter_mesh_consistency(self, features: np.ndarray):
+        """
+        Đánh giá độ nhất quán sau khi đã căn chỉnh (Procrustes Analysis) để bỏ qua
+        sự khác biệt về vị trí, hướng, và tỷ lệ tổng thể.
+        """
+        n_meshes = features.shape[0]
+        # Lấy mẫu ngẫu nhiên
+        selected_indices = np.random.choice(n_meshes, size=min(50, n_meshes), replace=False)
+        selected_features = features[selected_indices]
+        
+        n_landmarks = selected_features.shape[1] // 3
+        
+        # Reshape về dạng (n_meshes, n_landmarks, 3)
+        landmark_positions = selected_features.reshape(-1, n_landmarks, 3)
+        
+        # 1. Generalized Procrustes Analysis (GPA)
+        # Chọn mesh đầu tiên làm reference (hoặc tính mean shape)
+        reference_shape = landmark_positions[0]
+        aligned_shapes = []
+        
+        # Thực hiện căn chỉnh cho tất cả các meshes còn lại so với reference
+        for i in range(landmark_positions.shape[0]):
+            target_shape = landmark_positions[i]
+            
+            try:
+                mtx1, mtx2_aligned, _ = procrustes(reference_shape, target_shape)
+                aligned_shapes.append(mtx2_aligned)
+            except ValueError:
+                continue
+
+        if not aligned_shapes:
+            return 0.0
+            
+        aligned_landmarks = np.stack(aligned_shapes, axis=0) # shape: (N_aligned, n_landmarks, 3)
+        
+        # 2. Tính độ lệch chuẩn trên các landmark đã được căn chỉnh
+        landmark_std_aligned = np.std(aligned_landmarks, axis=0)  # shape: (n_landmarks, 3)
+        norms_aligned = np.linalg.norm(landmark_std_aligned, axis=1)
+        
+        # Giá trị càng thấp càng tốt
+        avg_std_per_landmark_aligned = np.mean(norms_aligned)
+        
+        print(f"Inter-mesh consistency (avg std per landmark, Procrustes-aligned): {avg_std_per_landmark_aligned:.6f}")
+        return avg_std_per_landmark_aligned
+
+    def compute_landmark_shape_correlation(self, vertices: np.ndarray, features: np.ndarray, k_neighbors: int = 20):
+        """
+        Tính tương quan cục bộ giữa landmark và các đỉnh lân cận (K-NN) để đánh giá tính gắn kết cục bộ.
+        """
+        n_meshes = vertices.shape[0]
+        # Tăng kích thước mẫu để có thống kê tốt hơn
+        selected_indices = np.random.choice(n_meshes, size=min(100, n_meshes), replace=False) 
+        
+        sample_vertices = vertices[selected_indices]  # shape: (N_sample, n_vertices*3)
+        sample_features = features[selected_indices]  # shape: (N_sample, n_landmarks*3)
+        
+        correlations = []
+        n_landmarks = sample_features.shape[1] // 3
+        n_vertices = sample_vertices.shape[1] // 3
+        
+        # Reshape về dạng (N_sample, n_landmarks, 3)
+        landmarks_reshaped = sample_features.reshape(-1, n_landmarks, 3) 
+        
+        # --- 1. Xây dựng KDTree từ MESH MẪU ---
+        
+        # Chọn mesh đầu tiên làm đại diện để tìm các đỉnh lân cận
+        reference_mesh_idx = 0 
+        # Vị trí 3D của tất cả vertices trên mesh mẫu: shape (n_vertices, 3)
+        reference_vertices_3d = sample_vertices[reference_mesh_idx].reshape(n_vertices, 3)
+        
+        # Xây dựng cây KDTree để tìm lân cận nhanh
+        tree = KDTree(reference_vertices_3d) 
+        
+        # --- 2. Vòng lặp qua các Landmark ---
+        for i in range(n_landmarks):
+            # Tọa độ của landmark thứ i trên tất cả meshes: shape (N_sample, 3)
+            landmark_i = landmarks_reshaped[:, i, :]  
+            
+            # Lấy vị trí landmark i trên mesh mẫu đầu tiên
+            current_landmark_coords = landmarks_reshaped[reference_mesh_idx, i, :]
+            
+            # Tìm K đỉnh gần nhất (K-NN) trong không gian Euclide
+            distances, sampled_vertex_indices = tree.query(current_landmark_coords, k=k_neighbors)
+            
+            # --- 3. Vòng lặp qua các Đỉnh Lân cận (Đã được tìm thấy) ---
+            for vertex_index in sampled_vertex_indices: # type: ignore
+                
+                # Đảm bảo chỉ số không nằm ngoài giới hạn (mặc dù tree.query đã xử lý)
+                if vertex_index >= n_vertices: continue 
+
+                # Lấy tọa độ (X, Y, Z) của đỉnh này trên tất cả N_sample meshes
+                start_col = vertex_index * 3
+                end_col = vertex_index * 3 + 3
+                
+                # vtx_coords_all_meshes: shape (N_sample, 3)
+                # Đây là tọa độ của đỉnh 'vertex_index' trên tất cả các mesh đã chọn
+                vtx_coords_all_meshes = sample_vertices[:, start_col:end_col]
+                
+                # --- 4. Tính correlation cho từng dimension (x, y, z) ---
+                for dim in range(3):
+                    
+                    L_dim = landmark_i[:, dim]
+                    V_dim = vtx_coords_all_meshes[:, dim]
+
+                    # Cần đảm bảo std > 0 để corrcoef hoạt động
+                    # Điều kiện này ngăn việc tính tương quan nếu dữ liệu không thay đổi
+                    if (np.std(L_dim) > 1e-10 and np.std(V_dim) > 1e-10):
+                        
+                        # np.corrcoef trả về ma trận 2x2. Ta chỉ cần giá trị tương quan [0, 1]
+                        corr = np.corrcoef(L_dim, V_dim)[0, 1]
+                        
+                        if not np.isnan(corr):
+                            correlations.append(abs(corr))
+        
+        shape_correlation = np.mean(correlations) if correlations else 0
+        print(f"Shape correlation score (K-NN local, K={k_neighbors}): {shape_correlation:.6f}")
+        
+        # Kiểm tra cuối cùng: Nếu correlations rỗng
+        if not correlations:
+            print("CẢNH BÁO: Không có tương quan nào được tính (có thể do lỗi indexing hoặc std=0).")
+            
+        return shape_correlation
+
+    def compute_feature_reconstruction_capability(self, vertices: np.ndarray, features: np.ndarray):
+        """
+        Optimized feature reconstruction capability using regular PCA and consistent feature size
+        """
+        n = vertices.shape[0]
+        random_list = np.random.choice(n, size=50, replace=False)
+        sample_vertices = vertices[random_list]
+        sample_features = features[random_list]
+        
+        # Convert to arrays and ensure consistent dimensions
+        all_landmarks = np.array(sample_features)
+        all_shapes = np.array(sample_vertices)
+        
+        # Check dimensions
+        if all_landmarks.shape[0] < 2 or all_shapes.shape[0] < 2:
+            print("Warning: Not enough samples for PCA")
+            return 0.5  # Return neutral score
+        
+        # Use regular PCA instead of IncrementalPCA for stability
+        n_components = min(5, all_landmarks.shape[0] - 1, all_landmarks.shape[1])
+        
+        if n_components < 1:
+            return 0.5
+        
+        try:
+            # PCA on landmarks
+            pca_landmarks = PCA(n_components=n_components)
+            landmark_pcs = pca_landmarks.fit_transform(all_landmarks)
+            
+            # PCA on shapes
+            pca_shapes = PCA(n_components=n_components)
+            shape_pcs = pca_shapes.fit_transform(all_shapes)
+            
+            # Vectorized correlation calculation
+            correlations = []
+            for i in range(min(landmark_pcs.shape[1], shape_pcs.shape[1])):
+                if (np.std(landmark_pcs[:, i]) > 1e-10 and np.std(shape_pcs[:, i]) > 1e-10):
+                    corr = np.corrcoef(landmark_pcs[:, i], shape_pcs[:, i])[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(abs(corr))
+            
+            pca_correlation = np.mean(correlations) if correlations else 0
+            
+            # Variance ratio (first 3 components for speed)
+            variance_ratio = np.sum(pca_landmarks.explained_variance_ratio_[:min(3, n_components)])
+            
+            reconstruction_score = (pca_correlation + variance_ratio) / 2
+            
+            print(f"Feature reconstruction capability: {reconstruction_score:.6f}")
+            return reconstruction_score
+            
+        except Exception as e:
+            print(f"PCA computation failed: {e}")
+            return 0.5 # Return neutral score on failure
+
+    def compute_anatomical_sensitivity(self, vertices: np.ndarray, features: np.ndarray):
+        """
+        Tính độ nhạy cảm với biến đổi giải phẫu.
+        """
+        n_meshes = vertices.shape[0]
+        selected_indices = np.random.choice(n_meshes, size=min(50, n_meshes), replace=False)
+        
+        sample_vertices = vertices[selected_indices]  # shape: (50, n_vertices*3)
+        sample_features = features[selected_indices]  # shape: (50, n_landmarks*3)
+        
+        # 1. Tính kích thước mesh nội tại (Volume)
+        mesh_volumes = []
+        for i in range(sample_vertices.shape[0]):
+            # Sử dụng hàm giả định để tính Volume/Area (THAY THẾ BẰNG HÀM THỰC TẾ)
+            volume = self._compute_mesh_volume(sample_vertices[i])
+            mesh_volumes.append(volume)
+        
+        mesh_volumes = np.array(mesh_volumes)  # shape: (50,)
+        
+        # Chuẩn hóa volume để giảm ảnh hưởng của độ lớn tuyệt đối
+        mesh_volumes_normalized = (mesh_volumes - np.mean(mesh_volumes)) / (np.std(mesh_volumes) + 1e-8)
+        
+        # Reshape features to (50, n_landmarks, 3)
+        n_landmarks = sample_features.shape[1] // 3
+        landmarks_reshaped = sample_features.reshape(-1, n_landmarks, 3)  # (50, n_landmarks, 3)
+        
+        # 2. Tính correlation giữa Volume và tọa độ landmark
+        correlations = []
+        
+        for landmark_idx in range(n_landmarks):
+            landmark_coords = landmarks_reshaped[:, landmark_idx, :]
+            
+            # Tính correlation cho từng tọa độ (x, y, z)
+            for coord_idx in range(3):
+                landmark_dim_coords = landmark_coords[:, coord_idx]
+                
+                # Cần đảm bảo std > 0
+                if (np.std(mesh_volumes_normalized) > 1e-10 and np.std(landmark_dim_coords) > 1e-10):
+                    # Tính tương quan giữa Volume và tọa độ của landmark
+                    corr = np.corrcoef(mesh_volumes_normalized, landmark_dim_coords)[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(abs(corr))
+        
+        anatomical_sensitivity = np.mean(correlations) if correlations else 0
+        
+        print(f"Anatomical variation sensitivity (Volume-based): {anatomical_sensitivity:.6f}")
+        return anatomical_sensitivity
+
+    def evaluate_cross_landmarking_performance(self, vertices: np.ndarray, features: np.ndarray):
+        """
+        Optimized comprehensive evaluation
+        """
+        evaluation_metrics = {}
+        
+        # Đảm bảo chúng ta có đủ samples
+        n_meshes = vertices.shape[0]
+        if n_meshes < 2:
+            print("Warning: Not enough meshes for evaluation")
+            return {}
+        
+        # Run evaluations
+        inter_mesh_consistency = self.compute_inter_mesh_consistency(features)
+        shape_correlation = self.compute_landmark_shape_correlation(vertices, features)
+        reconstruction_capability = self.compute_feature_reconstruction_capability(vertices, features)
+        anatomical_sensitivity = self.compute_anatomical_sensitivity(vertices, features)
+        
+        # Convert consistency to score (lower std = better)
+        consistency_score = 1.0 / (1.0 + inter_mesh_consistency)
+        evaluation_metrics['consistency_score'] = consistency_score
+        evaluation_metrics['inter_mesh_std'] = inter_mesh_consistency
+        evaluation_metrics['shape_correlation'] = shape_correlation
+        evaluation_metrics['feature_reconstruction'] = reconstruction_capability
+        evaluation_metrics['anatomical_sensitivity'] = anatomical_sensitivity
+        
+        return evaluation_metrics
+
     # ===== Main functions =====
-    def train(self):
+    def cross_landmark(self):
+        """
+        Optimized main cross-landmark function
+        """
         # Load template mesh
         template_mesh = self.template_mesh
-        template_mesh_NoMuscle = trimesh.load_mesh("./train_data/TempPelvisBoneMesh.ply")
+
         if template_mesh is None:
             raise ValueError("Template mesh is not set in the model state.")
 
-        # Example landmark points (replace with actual data)
-        landmarks = []
-        for vertex in self.state.picked_vertices:
-            x, y, z = float(vertex["x"]), float(vertex["y"]), float(vertex["z"])
-            landmark = (x, y, z)
-            landmarks.append(landmark)
+        # Extract landmark points
+        landmarks = np.array([
+            [float(vertex["x"]), float(vertex["y"]), float(vertex["z"])]
+            for vertex in self.state.picked_vertices
+        ])
         
-        landmarks = np.array(landmarks)
+        if len(landmarks) == 0:
+            raise ValueError("No landmarks provided for cross-landmarking.")
 
-        # Compute barycentric coordinates and triangle indices
-        tri_template_mesh = self.vtk_to_trimesh(template_mesh)
-        pelvisBoneVertexIndices = self.estimateNearestIndicesKDTreeBased(template_mesh_NoMuscle.vertices, tri_template_mesh.vertices)
+        # Compute barycentric coordinates
         pelvicFeatureBaryIndices, pelvicFeatureBaryCoords = self.computeBarycentricLandmarks(template_mesh, landmarks)
 
-        vertices = []
-        features = []
+        # Process files
+        all_vertices = []
+        all_features = []
 
         for file in file_list:
             mesh = self.load_mesh(f"{train_path}/{file}")
             tri_mesh = self.vtk_to_trimesh(mesh)
-            pelvicFeatures = self.reconstructLandmarksFromBarycentric(tri_mesh, pelvicFeatureBaryIndices, pelvicFeatureBaryCoords)
-            vertices.append(tri_mesh.vertices.flatten())
-            features.append(pelvicFeatures.flatten())
+            pelvicFeatures = self.reconstructLandmarksFromBarycentric(
+                tri_mesh, pelvicFeatureBaryIndices, pelvicFeatureBaryCoords
+            )
+            all_vertices.append(tri_mesh.vertices.flatten())
+            all_features.append(pelvicFeatures.flatten())
 
+        # Convert to arrays
+        vertices_array = np.array(all_vertices)  # shape: (n_meshes, n_vertices*3)
+        features_array = np.array(all_features)  # shape: (n_meshes, n_landmarks*3)
+        
+        # Evaluate performance
+        if vertices_array.shape[0] > 0:
+            performance_metrics = self.evaluate_cross_landmarking_performance(
+                vertices=vertices_array,
+                features=features_array
+            )
+        else:
+            performance_metrics = {}
+
+        return all_vertices, all_features, performance_metrics
+    
+    def train(self, vertices, features):
+        # Load template mesh
+        template_mesh = self.template_mesh
+        template_mesh_NoMuscle = trimesh.load_mesh("./train_data/TempPelvisBoneMesh.ply")
+        # Estimate the nearest indices
+        tri_template_mesh = self.vtk_to_trimesh(template_mesh)
+        pelvisBoneVertexIndices = self.estimateNearestIndicesKDTreeBased(template_mesh_NoMuscle.vertices, tri_template_mesh.vertices)
+        
         trainingPelvicFeatureData, validPelvicFeatureData, trainingPelvicVertexData, validPelvicVertexData = train_test_split(features, vertices, test_size= 0.2, random_state= 42, shuffle= True)
 
         numComps = self.state.n_components
@@ -206,8 +504,6 @@ class Model:
         xScaler = StandardScaler().fit(trainingPelvicFeatureData)
         scaledYData = yScaler.transform(trainingPelvicVertexData)
         scaledXData = xScaler.transform(trainingPelvicFeatureData)
-
-        self.state.train_data_status = 'success'
 
         # Control the number of components
         targetNumComps = numComps
