@@ -21,10 +21,10 @@ file_list = os.listdir(train_path)
 
 # Model
 class Model:
-    def __init__(self, ctrl, state):
+    def __init__(self, ctrl, state, template_mesh):
         self.ctrl = ctrl
         self.state = state
-        self.template_mesh = self.state.template_mesh
+        self.template_mesh = template_mesh
     
     # ===== Sub-functions =====
     def load_mesh(self, mesh_path):

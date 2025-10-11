@@ -279,7 +279,7 @@ mesh_point_picker = Mesh(
 )
 
 # ===== Model =====
-model = Model(ctrl, state)
+model = Model(ctrl, state, template_mesh)
 
 # Add observer for mouse movement
 interactor_2d.AddObserver(vtkCommand.MouseMoveEvent, mouse.on_mouse_move)
@@ -470,10 +470,50 @@ def on_file_content_change(file_content, **kwargs):
         state.file_content = None
 
 # ===== Export mesh =====
-@state.change("file_mesh_extend")
+def get_current_display_mesh():
+    """Lấy mesh đang được hiển thị dựa trên state hiện tại"""
+    if state.reconstruct_mode:
+        if state.show_faces and predictMesh is not None:
+            return predictMesh
+        elif predictMesh_no_faces is not None:
+            return predictMesh_no_faces
+        else:
+            return None  # Không có mesh trong chế độ reconstruct
+    elif state.create_model_mode:
+        return mesh_source.GetOutput()
+    else:
+        return None  # Không có mesh để export trong các chế độ khác
+@state.change("export_dialog")
 def on_dialog_change(export_dialog, **kwargs):
     if export_dialog:
-        state.mesh_content = export_mesh(state, mesh_source.GetOutput())
+        mesh_to_export = get_current_display_mesh()
+        
+        if mesh_to_export is None:
+            # Hiển thị thông báo lỗi
+            state.status = "❌ No mesh available to export. Please load or reconstruct a mesh first."
+            print("❌ No mesh available to export")
+            
+            # Đóng dialog export sau một khoảng thời gian ngắn
+            import threading
+            def close_dialog():
+                import time
+                time.sleep(2)  # Đợi 2 giây để người dùng đọc thông báo
+                state.export_dialog = False
+                state.status = ""  # Xóa thông báo sau khi đóng dialog
+            
+            thread = threading.Thread(target=close_dialog)
+            thread.daemon = True
+            thread.start()
+            
+            return  # Dừng xử lý, không export
+            
+        # Debug thông tin mesh được export
+        num_points = mesh_to_export.GetNumberOfPoints()
+        num_cells = mesh_to_export.GetNumberOfCells()
+        print(f"🔍 Exporting mesh: {num_points} points, {num_cells} cells")
+        
+        state.mesh_content = export_mesh(state, mesh_to_export)
+        state.status = "✅ Mesh exported successfully!"
 
 # ===== Create model =====
 @state.change("create_model_mode")
@@ -539,7 +579,9 @@ def train_model(train_data_status, **kwargs):
         # Start training process
         print("Training model...")
         model_content, xScaler, yScaler, xSSM, ySSM = model.train()
+        print("Train successfully, saving...")
         state.model_content = model.save_model(model_content, xScaler, yScaler, xSSM, ySSM)
+        print("Save successfully")
         state.train_data_status_text = "Data prepared successfully!"
         state.train_model_status = "success"
         state.train_model_status_text = "Model trained successfully!"
