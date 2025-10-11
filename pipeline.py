@@ -565,7 +565,6 @@ def on_reconstruct_mode_change(reconstruct_mode, model_file, **kwargs):
                 state.status = "❌ Template mesh not loaded properly"
                 return
 
-        
             # Trích xuất bytes từ dictionary
             if isinstance(model_file, dict):
                 if 'content' in model_file:
@@ -616,10 +615,17 @@ def on_reconstruct_mode_change(reconstruct_mode, model_file, **kwargs):
                         predYData = yScaler.inverse_transform(predScaledYData)
                         predYData = predYData.reshape(-1, 3)
 
-                        predictMesh = model.create_mesh_polydata(predYData,template_faces)
-
+                        # Tạo mesh và hiển thị thông tin debug
+                        predictMesh = model.create_mesh_polydata(predYData, template_faces)
                         predictMesh_no_faces = model.create_vertices_polydata(predYData)
-
+                        
+                        # DEBUG: Hiển thị thông tin mesh
+                        print_mesh_debug_info(predictMesh, "Mesh với faces")
+                        print_mesh_debug_info(predictMesh_no_faces, "Mesh không faces")
+                        
+                        # DEBUG: Hiển thị thông tin vertices
+                        print_vertices_info(predYData, "Predicted vertices")
+                        
                     else:
                         print("❌ predYParams is None, cannot inverse transform.")
             else:
@@ -627,6 +633,7 @@ def on_reconstruct_mode_change(reconstruct_mode, model_file, **kwargs):
             
             render_window_3d.RemoveRenderer(renderer_3d)
             render_window_3d.AddRenderer(recon_renderer)
+            update_mesh_display()
         except Exception as e:
             print(f"❌ Reconstruction error: {e}")
             import traceback
@@ -642,6 +649,57 @@ def on_reconstruct_mode_change(reconstruct_mode, model_file, **kwargs):
     
     ctrl.view_update_3d()
 
+def print_mesh_debug_info(mesh, mesh_name="Mesh"):
+    """In thông tin debug về mesh"""
+    if mesh is None:
+        print(f"❌ {mesh_name}: None")
+        return
+        
+    try:
+        # Lấy số lượng points và cells
+        num_points = mesh.GetNumberOfPoints()
+        num_cells = mesh.GetNumberOfCells()
+        
+        # Lấy phạm vi tọa độ
+        bounds = mesh.GetBounds()
+        
+        print(f"🔍 {mesh_name} Debug Info:")
+        print(f"   - Số lượng points: {num_points}")
+        print(f"   - Số lượng cells: {num_cells}")
+        print(f"   - Bounds: x[{bounds[0]:.2f}, {bounds[1]:.2f}], "
+              f"y[{bounds[2]:.2f}, {bounds[3]:.2f}], "
+              f"z[{bounds[4]:.2f}, {bounds[5]:.2f}]")
+        
+        # Hiển thị thông tin về 5 điểm đầu tiên
+        if num_points > 0:
+            print(f"   - 5 điểm đầu tiên:")
+            for i in range(min(5, num_points)):
+                point = mesh.GetPoint(i)
+                print(f"     Point {i}: ({point[0]:.2f}, {point[1]:.2f}, {point[2]:.2f})")
+                
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy thông tin {mesh_name}: {e}")
+
+def print_vertices_info(vertices, vertices_name="Vertices"):
+    """In thông tin debug về vertices"""
+    if vertices is None:
+        print(f"❌ {vertices_name}: None")
+        return
+        
+    try:
+        print(f"🔍 {vertices_name} Debug Info:")
+        print(f"   - Shape: {vertices.shape}")
+        print(f"   - Kiểu dữ liệu: {vertices.dtype}")
+        print(f"   - Phạm vi: x[{vertices[:,0].min():.2f}, {vertices[:,0].max():.2f}], "
+              f"y[{vertices[:,1].min():.2f}, {vertices[:,1].max():.2f}], "
+              f"z[{vertices[:,2].min():.2f}, {vertices[:,2].max():.2f}]")
+        print(f"   - 5 vertices đầu tiên:")
+        for i in range(min(5, len(vertices))):
+            print(f"     {i}: ({vertices[i,0]:.2f}, {vertices[i,1]:.2f}, {vertices[i,2]:.2f})")
+            
+    except Exception as e:
+        print(f"❌ Lỗi khi lấy thông tin {vertices_name}: {e}")
+
 def update_mesh_display():
     """Cập nhật hiển thị mesh dựa trên state.show_faces"""
     global predictMesh, predictMesh_no_faces
@@ -650,10 +708,13 @@ def update_mesh_display():
     recon_renderer.RemoveAllViewProps()
     
     if state.show_faces and predictMesh:
+        print("🔄 Hiển thị mesh với faces")
         display_actor = create_actor_from_polydata(predictMesh, color=(1, 1, 1), representation="surface")
     elif predictMesh_no_faces:
+        print("🔄 Hiển thị mesh dạng points")
         display_actor = create_actor_from_polydata(predictMesh_no_faces, color=(1, 1, 1), representation="points")
     else:
+        print("❌ Không có mesh nào để hiển thị")
         return
         
     recon_renderer.AddActor(display_actor)
@@ -682,6 +743,7 @@ def create_actor_from_polydata(polydata, color=(1, 1, 1), representation="surfac
 @state.change("show_faces")   
 def on_show_faces_change(show_faces, **kwargs):
     """Xử lý khi toggle show faces"""
+    print(f"🔄 Thay đổi chế độ hiển thị faces: {show_faces}")
     if state.reconstruct_mode:
         update_mesh_display()
 #---------------------------------------------------------
