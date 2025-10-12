@@ -26,6 +26,8 @@ from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper
 import vtkmodules.vtkRenderingOpenGL2
 import vtkmodules.vtkInteractionStyle
 
+from config.config import resource_path
+
 # Import tools
 from tools.slice import Slice
 from tools.mouse import Mouse
@@ -40,8 +42,8 @@ from tools.model import Model
 #---------------------------------------------------------
 # Define constant
 #---------------------------------------------------------
-temp_path = "./temp_folder/"
-train_path = "./train_data/PersonalizedPelvisStructures/"
+temp_path = resource_path("temp_folder/")
+train_path = resource_path("train_data/PersonalizedPelvisStructures/")
 
 file_list = os.listdir(train_path)
 file_list = [f for f in file_list if os.path.isfile(os.path.join(train_path, f)) and f.endswith("ply")]
@@ -190,7 +192,7 @@ renderer_3d.AddActor(plane_actor)
 
 # ===== Mesh =====
 mesh_source = vtkPLYReader()
-mesh_source.SetFileName(f"./train_data/{file_sample_mesh}")
+mesh_source.SetFileName(resource_path(f"train_data/{file_sample_mesh}"))
 mesh_source.Update()
 template_mesh = mesh_source.GetOutput()
 

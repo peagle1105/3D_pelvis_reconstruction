@@ -15,8 +15,9 @@ import joblib
 import shutil
 import zipfile
 import tempfile
+from config.config import resource_path
 
-train_path = "./train_data/PersonalizedPelvisStructures"
+train_path = resource_path("train_data/PersonalizedPelvisStructures")
 file_list = os.listdir(train_path)
 
 # Model
@@ -491,7 +492,7 @@ class Model:
     def train(self, vertices, features):
         # Load template mesh
         template_mesh = self.template_mesh
-        template_mesh_NoMuscle = trimesh.load_mesh("./train_data/TempPelvisBoneMesh.ply")
+        template_mesh_NoMuscle = trimesh.load_mesh(resource_path("train_data/TempPelvisBoneMesh.ply"))
         # Estimate the nearest indices
         tri_template_mesh = self.vtk_to_trimesh(template_mesh)
         pelvisBoneVertexIndices = self.estimateNearestIndicesKDTreeBased(template_mesh_NoMuscle.vertices, tri_template_mesh.vertices)
@@ -557,8 +558,8 @@ class Model:
         return model, xScaler, yScaler, xSSM, ySSM
     
     def save_model(self, model, xScaler, yScaler, xSSM, ySSM):
-        temp_dir = "./temp_model_path"
-        zip_path = "./model_archive.zip"
+        temp_dir = resource_path("temp_model_path")
+        zip_path = resource_path("model_archive.zip")
 
         # Bước 1: Tạo thư mục tạm
         os.makedirs(temp_dir, exist_ok=True)

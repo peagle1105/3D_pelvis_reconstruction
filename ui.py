@@ -7,6 +7,8 @@ server, ctrl, state, render_window_2d, render_window_3d, interactor_2d, interact
 from trame.ui.vuetify import SinglePageLayout
 from trame.widgets import vtk, vuetify
 
+from config.config import resource_path
+
 state.header = [
     {'text': 'Name', 'value': 'name', 'width': '30%'},
     {'text': 'X', 'value': 'x', 'width': '15%'},
@@ -14,7 +16,7 @@ state.header = [
     {'text': 'Z', 'value': 'z', 'width': '15%'},
     {'text': 'Source', 'value': 'source', 'width': '25%'}
 ]
-logo_path = "./static/logo.png"
+logo_path = resource_path("static/logo.png")
 with open(logo_path, "rb") as f:
     img_data = f.read()
 img_base64 = base64.b64encode(img_data).decode('utf-8')

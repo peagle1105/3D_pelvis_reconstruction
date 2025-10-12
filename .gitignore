@@ -2,3 +2,5 @@ venv/
 temp_folder/
 train_data/PersonalizedPelvisStructures/
 train_data/Landmarks/
+build/
+dist/

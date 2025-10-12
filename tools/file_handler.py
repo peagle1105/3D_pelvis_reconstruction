@@ -5,8 +5,9 @@ from io import BytesIO
 import vtk
 import os
 import tempfile
+from config.config import resource_path
 
-temp_path = "./temp_folder/"
+temp_path = resource_path("temp_folder/")
 
 # Sub-function
 def get_ply_content(mesh_data):
