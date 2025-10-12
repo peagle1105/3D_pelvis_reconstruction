@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['ui.py'],
+    ['PelviREANA.py'],
     pathex=[],
     binaries=[],
     datas=[('config', 'config'), ('static', 'static'), ('train_data', 'train_data'), ('temp_folder', 'temp_folder'), ('tools', 'tools')],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ui',
+    name='PelviREANA',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
