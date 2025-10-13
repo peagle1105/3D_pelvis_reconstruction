@@ -902,5 +902,8 @@ with SinglePageLayout(server, drawer = None) as layout:
 #---------------------------------------------------------
 # Start server
 #---------------------------------------------------------
+def main(**kwargs):
+    server.start(**kwargs)# type: ignore
+
 if __name__ == "__main__":
-    server.start()  # type: ignore
+    main()
